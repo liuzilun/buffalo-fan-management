@@ -354,15 +354,14 @@
             </div>
             <div class="form-group">
                 <label>客户名称 *</label>
-                <select id="addOrderCustomer" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
-                    <option value="">-- 请选择客户 --</option>
-                </select>
+                <input type="text" id="addOrderCustomer" list="customerList_add" placeholder="选择或输入客户名称" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;">
+                <datalist id="customerList_add"></datalist>
             </div>
             <div class="form-group">
-                <label>风机型号 *</label>
-                <select id="addOrderModel" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
-                    <option value="">-- 请选择风机型号 --</option>
-                </select>
+                <label>风机型号 *（可多选）</label>
+                <input type="text" id="addOrderModelInput" list="modelList_add" placeholder="选择或输入型号后按回车添加" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;" onkeydown="if(event.key==='Enter'){event.preventDefault();addModelTag('add');}">
+                <datalist id="modelList_add"></datalist>
+                <div id="addModelTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
             </div>
             <div class="form-group">
                 <label>订单数量</label>
@@ -398,15 +397,14 @@
             </div>
             <div class="form-group">
                 <label>客户名称 *</label>
-                <select id="editOrderCustomer" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
-                    <option value="">-- 请选择客户 --</option>
-                </select>
+                <input type="text" id="editOrderCustomer" list="customerList_edit" placeholder="选择或输入客户名称" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;">
+                <datalist id="customerList_edit"></datalist>
             </div>
             <div class="form-group">
-                <label>风机型号 *</label>
-                <select id="editOrderModel" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
-                    <option value="">-- 请选择风机型号 --</option>
-                </select>
+                <label>风机型号 *（可多选）</label>
+                <input type="text" id="editOrderModelInput" list="modelList_edit" placeholder="选择或输入型号后按回车添加" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;" onkeydown="if(event.key==='Enter'){event.preventDefault();addModelTag('edit');}">
+                <datalist id="modelList_edit"></datalist>
+                <div id="editModelTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
             </div>
             <div class="form-group">
                 <label>订单数量</label>
@@ -1427,6 +1425,7 @@
                                 <div class="timeline-operator">✓ 已完成 | 操作人: ${proc.operator || '未记录'} | ${proc.time ? new Date(proc.time).toLocaleString('zh-CN') : ''}</div>
                                 ${proc.remark ? `<div class="timeline-remark" style="color:#3498db;font-size:12px;">备注: ${proc.remark}</div>` : ''}
                                 ${proc.abnormal ? `<div class="timeline-abnormal" style="color:#e74c3c;font-size:12px;">异常: ${proc.abnormal}</div>` : ''}
+                                ${canEditProcess ? `<div style="margin-top:4px;"><button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="event.stopPropagation();editProcessRemark(${idx})">✏️ 编辑备注</button></div>` : ''}
                             ` : `<div class="timeline-operator">点击标记完成</div>`}
                         </div>
                     </div>
@@ -1540,6 +1539,32 @@
             });
             showOrderDetail(currentOrder.id);
         }
+
+        async function editProcessRemark(idx) {
+            if (!currentOrder) return;
+            const proc = currentOrder.processes[idx];
+            const pInfo = PROCESSES[idx];
+            const newRemark = prompt(`【${pInfo.name}】修改备注：`, proc.remark || '');
+            if (newRemark === null) return;
+            const newAbnormal = prompt(`【${pInfo.name}】修改异常记录：`, proc.abnormal || '');
+            if (newAbnormal === null) return;
+            proc.remark = newRemark;
+            proc.abnormal = newAbnormal;
+            await apiRequest('/orders/' + encodeURIComponent(currentOrder.id), {
+                method: 'PUT',
+                body: JSON.stringify({
+                    customer: currentOrder.customer,
+                    model: currentOrder.model,
+                    qty: currentOrder.qty,
+                    delivery: currentOrder.delivery,
+                    status: currentOrder.status,
+                    processes: currentOrder.processes,
+                    qc: currentOrder.qc
+                })
+            });
+            showOrderDetail(currentOrder.id);
+            showToast('备注已更新', 'success');
+        }
         
         // ============ 订单管理 ============
         function generateOrderId() {
@@ -1557,21 +1582,53 @@
             return `${prefix}N${seq}A`;
         }
 
-        function populateSelect(id, items, valueField, textField, defaultText) {
-            const sel = document.getElementById(id);
-            sel.innerHTML = `<option value="">-- ${defaultText} --</option>`;
+        // ============ 客户/机型选择辅助 ============
+        function populateDatalist(datalistId, items, field) {
+            const dl = document.getElementById(datalistId);
+            if (!dl) return;
+            dl.innerHTML = '';
             items.forEach(item => {
                 const opt = document.createElement('option');
-                opt.value = item[valueField];
-                opt.textContent = item[textField];
-                sel.appendChild(opt);
+                opt.value = item[field];
+                dl.appendChild(opt);
             });
+        }
+
+        let addModelList = [];
+        let editModelList = [];
+
+        function addModelTag(prefix) {
+            const input = document.getElementById(prefix + 'OrderModelInput');
+            const val = input.value.trim();
+            if (!val) return;
+            const list = prefix === 'add' ? addModelList : editModelList;
+            if (list.includes(val)) { showToast('该型号已添加', 'error'); input.value = ''; return; }
+            list.push(val);
+            input.value = '';
+            renderModelTags(prefix);
+        }
+
+        function removeModelTag(prefix, idx) {
+            const list = prefix === 'add' ? addModelList : editModelList;
+            list.splice(idx, 1);
+            renderModelTags(prefix);
+        }
+
+        function renderModelTags(prefix) {
+            const container = document.getElementById(prefix + 'ModelTags');
+            const list = prefix === 'add' ? addModelList : editModelList;
+            container.innerHTML = list.map((m, i) =>
+                `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--primary);color:#fff;border-radius:16px;font-size:13px;">${m} <span style="cursor:pointer;font-weight:700;" onclick="removeModelTag('${prefix}',${i})">×</span></span>`
+            ).join('');
         }
 
         function showAddOrderModal() {
             document.getElementById('addOrderId').value = generateOrderId();
-            populateSelect('addOrderCustomer', window.CUSTOMERS || [], 'name', 'name', '请选择客户');
-            populateSelect('addOrderModel', window.MODELS || [], 'name', 'name', '请选择风机型号');
+            populateDatalist('customerList_add', window.CUSTOMERS || [], 'name');
+            populateDatalist('modelList_add', window.MODELS || [], 'name');
+            document.getElementById('addOrderCustomer').value = '';
+            addModelList = [];
+            renderModelTags('add');
             document.getElementById('addOrderQty').value = '1';
             document.getElementById('addOrderDelivery').value = '';
             document.getElementById('addOrderPriority').value = 'normal';
@@ -1581,13 +1638,13 @@
         async function addOrder() {
             const id = document.getElementById('addOrderId').value.trim();
             const customer = document.getElementById('addOrderCustomer').value.trim();
-            const model = document.getElementById('addOrderModel').value.trim();
+            const model = addModelList.join(',');
             const qty = parseInt(document.getElementById('addOrderQty').value) || 1;
             const delivery = document.getElementById('addOrderDelivery').value;
             const priority = document.getElementById('addOrderPriority').value;
 
             if (!id || !customer || !model) {
-                showToast('请填写必填字段', 'error');
+                showToast('请填写订单号、客户名称和至少一个风机型号', 'error');
                 return;
             }
 
@@ -1619,10 +1676,11 @@
             
             document.getElementById('editOrderId').value = orderId;
             document.getElementById('editOrderNum').value = order.id;
-            populateSelect('editOrderCustomer', window.CUSTOMERS || [], 'name', 'name', '请选择客户');
+            populateDatalist('customerList_edit', window.CUSTOMERS || [], 'name');
             document.getElementById('editOrderCustomer').value = order.customer || '';
-            populateSelect('editOrderModel', window.MODELS || [], 'name', 'name', '请选择风机型号');
-            document.getElementById('editOrderModel').value = order.model || '';
+            populateDatalist('modelList_edit', window.MODELS || [], 'name');
+            editModelList = order.model ? order.model.split(',').filter(m => m) : [];
+            renderModelTags('edit');
             document.getElementById('editOrderQty').value = order.qty;
             document.getElementById('editOrderDelivery').value = order.delivery;
             document.getElementById('editOrderStatus').value = order.status;
@@ -1654,7 +1712,7 @@
             const updated = {
                 id: document.getElementById('editOrderNum').value.trim(),
                 customer: document.getElementById('editOrderCustomer').value.trim(),
-                model: document.getElementById('editOrderModel').value.trim(),
+                model: editModelList.join(','),
                 qty: parseInt(document.getElementById('editOrderQty').value) || 1,
                 delivery: document.getElementById('editOrderDelivery').value,
                 status: newStatus,
