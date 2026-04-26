@@ -1,0 +1,2996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>巴法洛风机项目跟踪系统 v7.0</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #3b82f6;
+            --secondary: #f97316;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray: #64748b;
+            --gray-dark: #334155;
+            --light: #f1f5f9;
+            --white: #ffffff;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #7c3aed 100%);
+            min-height: 100vh;
+        }
+        .app { max-width: 430px; margin: 0 auto; background: var(--light); min-height: 100vh; position: relative; }
+        
+        /* ========== 登录页 ========== */
+        .login-page {
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+            padding: 20px;
+        }
+        .login-header {
+            text-align: center;
+            padding: 50px 0 30px;
+        }
+        .login-logo-wrap {
+            width: 120px; 
+            height: 120px; 
+            margin: 0 auto 20px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        .login-logo-wrap svg { width: 80px; height: 80px; }
+        .login-header h1 {
+            color: #fff; 
+            font-size: 26px; 
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            margin-bottom: 8px;
+        }
+        .login-header p { 
+            color: rgba(255,255,255,0.8); 
+            font-size: 14px; 
+        }
+        .login-card { 
+            background: var(--white); 
+            border-radius: 24px; 
+            padding: 30px 25px; 
+            margin-top: auto;
+            margin-bottom: 40px;
+            box-shadow: var(--shadow-lg);
+        }
+        .login-card h2 { 
+            color: var(--gray-dark); 
+            font-size: 20px; 
+            margin-bottom: 25px; 
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--gray);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .login-card select, .login-card input { 
+            width: 100%; 
+            padding: 14px 16px; 
+            border: 2px solid var(--border); 
+            border-radius: 12px; 
+            font-size: 15px; 
+            outline: none; 
+            transition: all 0.3s;
+            background: var(--light);
+        }
+        .login-card select:focus, .login-card input:focus { 
+            border-color: var(--primary);
+            background: var(--white);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+        }
+        .login-btn {
+            width: 100%; 
+            padding: 16px; 
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); 
+            color: #fff; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        .login-btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 20px rgba(37,99,235,0.4);
+        }
+        .login-hint { 
+            text-align: center; 
+            margin-top: 20px; 
+            color: rgba(255,255,255,0.7); 
+            font-size: 13px; 
+        }
+        
+        /* ========== 主应用 ========== */
+        .main-app { display: none; }
+        .main-app.active { display: block; }
+        
+        /* ========== 顶部导航 ========== */
+        .top-bar { 
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: #fff; 
+            padding: 12px 15px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+        }
+        .top-bar-left { display: flex; align-items: center; gap: 12px; }
+        .top-bar-logo { 
+            width: 38px; 
+            height: 38px; 
+            border-radius: 10px; 
+            background: rgba(255,255,255,0.2);
+            padding: 5px;
+        }
+        .top-bar-logo svg { width: 100%; height: 100%; }
+        .top-bar-user { font-size: 15px; font-weight: 600; }
+        .top-bar-dept { font-size: 12px; opacity: 0.8; }
+        .top-bar-right { display: flex; align-items: center; gap: 12px; }
+        .top-bar-date { font-size: 12px; opacity: 0.9; }
+        .top-bar-btn { 
+            background: none; 
+            border: none; 
+            color: #fff; 
+            font-size: 20px; 
+            cursor: pointer; 
+            position: relative;
+            padding: 5px;
+        }
+        .top-bar-btn .badge { 
+            position: absolute; 
+            top: -2px; 
+            right: -2px; 
+            background: var(--danger); 
+            color: #fff; 
+            font-size: 10px; 
+            padding: 2px 6px; 
+            border-radius: 10px; 
+            min-width: 18px; 
+            text-align: center;
+        }
+        
+        /* ========== 页面内容 ========== */
+        .page-content { padding: 15px; padding-bottom: 85px; }
+        .page { display: none; }
+        .page.active { display: block; }
+        
+        /* ========== 首页 ========== */
+        .company-banner {
+            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+            color: #fff;
+            border-radius: 20px;
+            padding: 25px 20px;
+            margin-bottom: 15px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .company-banner::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+        .company-banner h2 { font-size: 20px; margin-bottom: 8px; }
+        .company-banner p { font-size: 13px; opacity: 0.9; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .stat-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 15px 10px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-icon { font-size: 24px; margin-bottom: 5px; }
+        .stat-num { font-size: 22px; font-weight: 700; color: var(--gray-dark); }
+        .stat-label { font-size: 11px; color: var(--gray); margin-top: 2px; }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-dark);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        /* ========== 项目列表 ========== */
+        .order-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .order-card:hover { transform: translateX(4px); }
+        .order-card.status-pending { border-left-color: var(--warning); }
+        .order-card.status-production { border-left-color: var(--primary); }
+        .order-card.status-qc { border-left-color: #8b5cf6; }
+        .order-card.status-completed { border-left-color: var(--success); }
+        .order-card.status-overdue { border-left-color: var(--danger); }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .order-id {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--gray-dark);
+        }
+        .order-name {
+            font-size: 13px;
+            color: var(--gray);
+            margin-top: 3px;
+        }
+        .order-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .badge-pending { background: #fef3c7; color: #d97706; }
+        .badge-production { background: #dbeafe; color: #2563eb; }
+        .badge-qc { background: #ede9fe; color: #7c3aed; }
+        .badge-completed { background: #d1fae5; color: #059669; }
+        .badge-overdue { background: #fee2e2; color: #dc2626; }
+        
+        .order-progress {
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .order-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .order-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--gray);
+            margin-top: 8px;
+        }
+        
+        /* ========== 项目详情 ========== */
+        .detail-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: var(--shadow);
+        }
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .detail-title { font-size: 18px; font-weight: 600; color: var(--gray-dark); }
+        
+        /* ========== 工序时间线 ========== */
+        .process-timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 25px;
+            padding-left: 20px;
+            border-left: 2px solid var(--border);
+        }
+        .timeline-item:last-child { border-left: none; }
+        .timeline-item.completed { border-left-color: var(--success); }
+        .timeline-item.current { border-left-color: var(--primary); }
+        
+        .timeline-dot {
+            position: absolute;
+            left: -10px;
+            top: 0;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--border);
+            border: 3px solid var(--white);
+            box-shadow: var(--shadow);
+        }
+        .timeline-item.completed .timeline-dot { background: var(--success); }
+        .timeline-item.current .timeline-dot { 
+            background: var(--primary); 
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(37,99,235,0); }
+        }
+        
+        .timeline-content {
+            background: var(--light);
+            border-radius: 12px;
+            padding: 12px 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .timeline-content:hover { background: var(--border); }
+        .timeline-content.completed { background: #d1fae5; }
+        .timeline-content.completed:hover { background: #a7f3d0; }
+        .timeline-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-dark);
+            margin-bottom: 4px;
+        }
+        .timeline-meta {
+            font-size: 12px;
+            color: var(--gray);
+        }
+        .timeline-operator {
+            font-size: 11px;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+        
+        /* ========== 甘特图 ========== */
+        .gantt-container {
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+        .gantt-row {
+            display: flex;
+            align-items: center;
+            height: 36px;
+            border-bottom: 1px solid var(--border);
+        }
+        .gantt-label {
+            width: 120px;
+            font-size: 12px;
+            color: var(--gray);
+            flex-shrink: 0;
+        }
+        .gantt-bar-container {
+            flex: 1;
+            height: 20px;
+            position: relative;
+            background: var(--light);
+            border-radius: 4px;
+        }
+        .gantt-bar {
+            position: absolute;
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            min-width: 30px;
+        }
+        .gantt-bar.completed { background: var(--success); }
+        .gantt-bar.current { background: var(--warning); }
+        
+        /* ========== QC节点 ========== */
+        .qc-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .qc-item {
+            background: var(--light);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+        .qc-item.pass { background: #d1fae5; }
+        .qc-item.fail { background: #fee2e2; }
+        .qc-item.pending { background: var(--light); }
+        .qc-icon { font-size: 24px; margin-bottom: 5px; }
+        .qc-name { font-size: 12px; color: var(--gray-dark); font-weight: 500; }
+        .qc-status { font-size: 11px; margin-top: 4px; }
+        .qc-status.pass { color: var(--success); }
+        .qc-status.fail { color: var(--danger); }
+        .qc-status.pending { color: var(--gray); }
+        
+        /* ========== BOM管理 ========== */
+        .bom-table-wrap {
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            min-width: 800px;
+        }
+        .data-table th {
+            background: var(--light);
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--gray-dark);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+        .data-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+            color: var(--gray-dark);
+        }
+        .data-table tr:hover { background: var(--light); }
+        
+        .bom-badge { 
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .bom-badge.enough { background: #d1fae5; color: #059669; }
+        .bom-badge.low { background: #fef3c7; color: #d97706; }
+        .bom-badge.out { background: #fee2e2; color: #dc2626; }
+        
+        /* ========== 库存管理 ========== */
+        .inv-tab-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+        }
+        .inv-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .inv-tab.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+        
+        .inv-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+        }
+        .inv-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .inv-name { font-size: 15px; font-weight: 600; color: var(--gray-dark); }
+        .inv-code { font-size: 12px; color: var(--gray); }
+        .inv-stats {
+            display: flex;
+            gap: 15px;
+        }
+        .inv-stat { text-align: center; }
+        .inv-stat .num { font-size: 20px; font-weight: 700; color: var(--gray-dark); }
+        .inv-stat .label { font-size: 11px; color: var(--gray); }
+        .inv-stat.danger .num { color: var(--danger); }
+        .inv-stat.warning .num { color: var(--warning); }
+        
+        /* ========== 人员管理 ========== */
+        .dept-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 15px;
+            box-shadow: var(--shadow);
+        }
+        .dept-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .dept-name { font-size: 15px; font-weight: 600; color: var(--gray-dark); }
+        .dept-count { font-size: 12px; color: var(--gray); background: var(--light); padding: 3px 10px; border-radius: 10px; }
+        
+        .staff-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 12px;
+        }
+        .staff-item {
+            text-align: center;
+            position: relative;
+        }
+        .staff-item:hover .actions { opacity: 1; }
+        .staff-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0 auto 8px;
+        }
+        .staff-name { font-size: 13px; font-weight: 500; color: var(--gray-dark); }
+        .staff-role { font-size: 11px; color: var(--gray); margin-top: 2px; }
+        .actions {
+            position: absolute;
+            top: 0;
+            right: 10px;
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .staff-action-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .staff-action-btn.edit { background: #dbeafe; }
+        .staff-action-btn.delete { background: #fee2e2; }
+        
+        /* ========== 底部导航 ========== */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 430px;
+            background: var(--white);
+            display: flex;
+            padding: 8px 0;
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 5px;
+            cursor: pointer;
+            color: var(--gray);
+            transition: all 0.2s;
+        }
+        .nav-item.active { color: var(--primary); }
+        .nav-item.active .nav-icon { background: #dbeafe; }
+        .nav-icon {
+            width: 40px;
+            height: 32px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 4px;
+            font-size: 20px;
+        }
+        .nav-label { font-size: 11px; }
+        
+        /* ========== 按钮 ========== */
+        .btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary {
+            background: var(--light);
+            color: var(--gray-dark);
+        }
+        .btn-secondary:hover { background: var(--border); }
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-icon {
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-icon.btn-secondary { background: #dbeafe; }
+        .btn-icon.btn-danger { background: #fee2e2; }
+        
+        .action-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        /* ========== 模态框 ========== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--white);
+            border-radius: 20px;
+            padding: 25px;
+            width: 100%;
+            max-width: 380px;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: modalIn 0.3s;
+        }
+        @keyframes modalIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .modal h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: var(--gray-dark);
+        }
+        .modal input, .modal select, .modal textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+            margin-bottom: 12px;
+            background: var(--light);
+        }
+        .modal input:focus, .modal select:focus, .modal textarea:focus {
+            border-color: var(--primary);
+            background: var(--white);
+        }
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-btns .btn { flex: 1; }
+        
+        /* ========== Toast ========== */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--gray-dark);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 2000;
+            animation: toastIn 0.3s;
+        }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        @keyframes toastIn {
+            from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        
+        /* ========== 筛选器 ========== */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .filter-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+        
+        /* ========== 搜索框 ========== */
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            background: var(--white);
+        }
+        .search-box input:focus { border-color: var(--primary); }
+        
+        /* ========== 空状态 ========== */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--gray);
+        }
+        .empty-state .icon { font-size: 50px; margin-bottom: 15px; }
+        .empty-state p { font-size: 14px; }
+        
+        /* ========== 导入提示 ========== */
+        .import-hint {
+            background: #fef3c7;
+            border-radius: 12px;
+            padding: 12px 15px;
+            font-size: 12px;
+            color: #92400e;
+            margin-bottom: 15px;
+        }
+        .import-hint strong { display: block; margin-bottom: 5px; }
+        
+        /* ========== 变更记录样式 ========== */
+        .change-record {
+            font-size: 10px;
+            color: var(--gray);
+            padding: 2px 6px;
+            background: var(--light);
+            border-radius: 4px;
+            margin: 2px;
+            display: inline-block;
+        }
+        
+        /* ========== 我的页面 ========== */
+        .profile-card {
+            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+            border-radius: 20px;
+            padding: 25px;
+            color: #fff;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .profile-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin: 0 auto 15px;
+        }
+        .profile-name { font-size: 20px; font-weight: 600; }
+        .profile-dept { font-size: 14px; opacity: 0.9; margin-top: 5px; }
+        
+        .menu-card {
+            background: var(--white);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .menu-item:last-child { border-bottom: none; }
+        .menu-item:hover { background: var(--light); }
+        .menu-icon { font-size: 22px; margin-right: 15px; }
+        .menu-text { flex: 1; font-size: 15px; color: var(--gray-dark); }
+        .menu-arrow { color: var(--gray); }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- 登录页 -->
+        <div class="login-page" id="loginPage">
+            <div class="login-header">
+                <div class="login-logo-wrap">
+                    <svg viewBox="0 0 100 100" fill="none">
+                        <circle cx="50" cy="50" r="45" fill="rgba(255,255,255,0.2)"/>
+                        <path d="M50 20 C30 20 20 35 20 50 C20 70 35 80 50 80 C65 80 80 70 80 50 C80 35 70 20 50 20" stroke="white" stroke-width="4" fill="none"/>
+                        <path d="M50 30 L50 70 M35 50 L65 50" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                        <circle cx="50" cy="50" r="8" fill="white"/>
+                    </svg>
+                </div>
+                <h1>巴法洛风机</h1>
+                <p>项目跟踪管理系统 v7.0</p>
+            </div>
+            <div class="login-card">
+                <h2>用户登录</h2>
+                <div class="form-group">
+                    <label>选择账号</label>
+                    <select id="userSelect">
+                        <option value="">-- 请选择 --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="passwordInput" placeholder="请输入密码" value="123456">
+                </div>
+                <button class="login-btn" onclick="login()">登 录</button>
+            </div>
+            <div class="login-hint">
+                演示账号密码: 123456
+            </div>
+        </div>
+        
+        <!-- 主应用 -->
+        <div class="main-app" id="mainApp">
+            <!-- 顶部栏 -->
+            <div class="top-bar">
+                <div class="top-bar-left">
+                    <div class="top-bar-logo">
+                        <svg viewBox="0 0 100 100" fill="white">
+                            <circle cx="50" cy="50" r="40" stroke="white" stroke-width="4" fill="none"/>
+                            <path d="M50 20 L50 80 M25 50 L75 50" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="top-bar-user"><span id="currentUser"></span></div>
+                        <div class="top-bar-dept"><span id="currentDept"></span></div>
+                    </div>
+                </div>
+                <div class="top-bar-right">
+                    <div class="top-bar-date" id="currentDate"></div>
+                    <button class="top-bar-btn" onclick="showTab('messages')">
+                        🔔
+                        <span class="badge" id="msgBadge" style="display:none;">0</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 页面内容 -->
+            <div class="page-content">
+                <!-- 首页 -->
+                <div class="page active" id="page-home">
+                    <div class="company-banner">
+                        <h2>🏭 巴法洛风机（苏州）有限公司</h2>
+                        <p>C.Buffalo Blower (SuZhou) Co.Ltd</p>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📋</div>
+                            <div class="stat-num" id="statTotal">0</div>
+                            <div class="stat-label">总订单</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⚙️</div>
+                            <div class="stat-num" id="statProduction">0</div>
+                            <div class="stat-label">生产中</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-num" id="statCompleted">0</div>
+                            <div class="stat-label">已完成</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⚠️</div>
+                            <div class="stat-num" id="statOverdue">0</div>
+                            <div class="stat-label">已逾期</div>
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">
+                        <span>🚧 在产项目</span>
+                    </div>
+                    <div id="productionOrders"></div>
+                    
+                    <div style="margin-top:20px;">
+                        <div class="section-title">
+                            <span>⚡ 快捷操作</span>
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button class="btn btn-secondary" style="flex:1;" onclick="showTab('orders')">
+                                📋 全部订单
+                            </button>
+                            <button class="btn btn-secondary" style="flex:1;" onclick="showTab('bom')">
+                                📦 BOM管理
+                            </button>
+                            <button class="btn btn-secondary" style="flex:1;" onclick="showTab('inventory')">
+                                🏭 库存
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 项目列表 -->
+                <div class="page" id="page-orders">
+                    <div class="section-title">
+                        <span>📋 项目列表</span>
+                        <button class="btn btn-primary btn-sm" onclick="showAddOrderModal()" id="addOrderBtn" style="display:none;">+ 新建</button>
+                    </div>
+                    <div class="filter-bar" id="orderFilter">
+                        <button class="filter-btn active" onclick="filterOrders('all', this)">全部</button>
+                        <button class="filter-btn" onclick="filterOrders('pending', this)">待生产</button>
+                        <button class="filter-btn" onclick="filterOrders('production', this)">生产中</button>
+                        <button class="filter-btn" onclick="filterOrders('qc', this)">质检中</button>
+                        <button class="filter-btn" onclick="filterOrders('completed', this)">已完成</button>
+                        <button class="filter-btn" onclick="filterOrders('overdue', this)">已逾期</button>
+                    </div>
+                    <div class="search-box">
+                        <input type="text" id="orderSearch" placeholder="搜索订单号/客户名..." oninput="searchOrders()">
+                    </div>
+                    <div id="ordersList"></div>
+                </div>
+                
+                <!-- 项目详情 -->
+                <div class="page" id="page-detail">
+                    <div class="detail-card" id="orderDetail"></div>
+                    <div class="detail-card" id="processSection"></div>
+                    <div class="detail-card" id="ganttSection"></div>
+                    <div class="detail-card" id="qcSection"></div>
+                </div>
+                
+                <!-- BOM管理 -->
+                <div class="page" id="page-bom">
+                    <div class="section-title">📦 物料清单 (BOM)</div>
+                    <div class="action-bar">
+                        <button class="btn btn-primary btn-sm" onclick="showAddBOMModal()">+ 添加物料</button>
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importBOMFile').click()">📥 批量导入</button>
+                        <button class="btn btn-secondary btn-sm" onclick="exportBOM()">📤 导出</button>
+                    </div>
+                    <input type="file" id="importBOMFile" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importBOMFile(this)">
+                    <div class="import-hint">
+                        <strong>💡 CSV批量导入说明：</strong>
+                        表头顺序：序号,代码,型号,名称,数量,材料,单重Kg,总重Kg,备注,厂家,变更1,变更2,变更3,变更4<br>
+                        第一行必须为表头，第二行开始为数据
+                    </div>
+                    <div class="bom-table-wrap">
+                        <table class="data-table" id="bomTable">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>代码</th>
+                                    <th>型号</th>
+                                    <th>名称</th>
+                                    <th>数量</th>
+                                    <th>材料</th>
+                                    <th>单重</th>
+                                    <th>总重</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bomTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 库存管理 -->
+                <div class="page" id="page-inventory">
+                    <div class="section-title">🏭 库存管理</div>
+                    <div class="inv-tab-bar">
+                        <button class="inv-tab active" onclick="switchInvTab('list', this)">库存在线</button>
+                        <button class="inv-tab" onclick="switchInvTab('in', this)">📥 入库</button>
+                        <button class="inv-tab" onclick="switchInvTab('out', this)">📤 出库</button>
+                        <button class="inv-tab" onclick="switchInvTab('logs', this)">📝 记录</button>
+                    </div>
+                    <div id="inventoryContent"></div>
+                </div>
+                
+                <!-- 人员管理 -->
+                <div class="page" id="page-staff">
+                    <div class="section-title">
+                        <span>👥 人员管理</span>
+                        <button class="btn btn-primary btn-sm" onclick="showAddStaffModal()" id="addStaffBtn" style="display:none;">+ 添加人员</button>
+                    </div>
+                    <div class="action-bar">
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importStaffFile').click()">📥 批量导入</button>
+                        <button class="btn btn-secondary btn-sm" onclick="exportStaff()">📤 导出</button>
+                    </div>
+                    <input type="file" id="importStaffFile" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importStaffFile(this)">
+                    <div id="deptList"></div>
+                </div>
+                
+                <!-- 消息中心 -->
+                <div class="page" id="page-messages">
+                    <div class="section-title">🔔 消息中心</div>
+                    <div id="messagesList"></div>
+                </div>
+                
+                <!-- 我的 -->
+                <div class="page" id="page-profile">
+                    <div class="profile-card">
+                        <div class="profile-avatar" id="profileAvatar">👤</div>
+                        <div class="profile-name" id="profileName"></div>
+                        <div class="profile-dept" id="profileDept"></div>
+                    </div>
+                    <div class="menu-card">
+                        <div class="menu-item" onclick="showTab('staff')">
+                            <span class="menu-icon">👥</span>
+                            <span class="menu-text">人员管理</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="showChangePasswordModal()">
+                            <span class="menu-icon">🔑</span>
+                            <span class="menu-text">修改密码</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="exportAllData()">
+                            <span class="menu-icon">💾</span>
+                            <span class="menu-text">导出全部数据</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="importAllData()">
+                            <span class="menu-icon">📂</span>
+                            <span class="menu-text">导入数据</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="showResetConfirm()">
+                            <span class="menu-icon">🔄</span>
+                            <span class="menu-text">重置所有数据</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="logout()">
+                            <span class="menu-icon">🚪</span>
+                            <span class="menu-text" style="color:var(--danger);">退出登录</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                    </div>
+                    <div style="text-align:center;margin-top:20px;color:var(--gray);font-size:12px;">
+                        巴法洛风机项目跟踪系统 v7.0<br>
+                        © 2024 Buffalo Blower (SuZhou)
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 底部导航 -->
+            <div class="bottom-nav">
+                <div class="nav-item active" onclick="showTab('home', this)">
+                    <div class="nav-icon">🏠</div>
+                    <div class="nav-label">首页</div>
+                </div>
+                <div class="nav-item" onclick="showTab('orders', this)">
+                    <div class="nav-icon">📋</div>
+                    <div class="nav-label">项目</div>
+                </div>
+                <div class="nav-item" onclick="showTab('bom', this)">
+                    <div class="nav-icon">📦</div>
+                    <div class="nav-label">BOM</div>
+                </div>
+                <div class="nav-item" onclick="showTab('inventory', this)">
+                    <div class="nav-icon">🏭</div>
+                    <div class="nav-label">库存</div>
+                </div>
+                <div class="nav-item" onclick="showTab('profile', this)">
+                    <div class="nav-icon">👤</div>
+                    <div class="nav-label">我的</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ========== 模态框 ========== -->
+    
+    <!-- 添加订单 -->
+    <div class="modal-overlay" id="addOrderModal">
+        <div class="modal">
+            <h3>➕ 新建订单</h3>
+            <div class="form-group">
+                <label>订单号 *</label>
+                <input type="text" id="addOrderId" placeholder="如: BF0426N550A">
+            </div>
+            <div class="form-group">
+                <label>客户名称 *</label>
+                <input type="text" id="addOrderCustomer" placeholder="客户公司名称">
+            </div>
+            <div class="form-group">
+                <label>风机型号 *</label>
+                <input type="text" id="addOrderModel" placeholder="如: BL61-S4900">
+            </div>
+            <div class="form-group">
+                <label>订单数量</label>
+                <input type="number" id="addOrderQty" placeholder="数量" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label>交货日期</label>
+                <input type="date" id="addOrderDelivery">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('addOrderModal')">取消</button>
+                <button class="btn btn-primary" onclick="addOrder()">创建</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑订单 -->
+    <div class="modal-overlay" id="editOrderModal">
+        <div class="modal">
+            <h3>✏️ 编辑订单</h3>
+            <input type="hidden" id="editOrderId">
+            <div class="form-group">
+                <label>订单号 *</label>
+                <input type="text" id="editOrderNum">
+            </div>
+            <div class="form-group">
+                <label>客户名称 *</label>
+                <input type="text" id="editOrderCustomer">
+            </div>
+            <div class="form-group">
+                <label>风机型号 *</label>
+                <input type="text" id="editOrderModel">
+            </div>
+            <div class="form-group">
+                <label>订单数量</label>
+                <input type="number" id="editOrderQty" min="1">
+            </div>
+            <div class="form-group">
+                <label>交货日期</label>
+                <input type="date" id="editOrderDelivery">
+            </div>
+            <div class="form-group">
+                <label>订单状态</label>
+                <select id="editOrderStatus">
+                    <option value="pending">待生产</option>
+                    <option value="production">生产中</option>
+                    <option value="qc">质检中</option>
+                    <option value="completed">已完成</option>
+                </select>
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('editOrderModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEditOrder()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加BOM物料 -->
+    <div class="modal-overlay" id="addBOMModal">
+        <div class="modal">
+            <h3>➕ 添加BOM物料</h3>
+            <input type="text" id="addBomCode" placeholder="代码 (如: BOM001)">
+            <input type="text" id="addBomModel" placeholder="型号">
+            <input type="text" id="addBomName" placeholder="物料名称 *">
+            <input type="number" id="addBomQty" placeholder="数量" min="0">
+            <input type="text" id="addBomMaterial" placeholder="材料">
+            <input type="number" id="addBomUnitWeight" placeholder="单重 (Kg)" step="0.01">
+            <input type="number" id="addBomTotalWeight" placeholder="总重 (Kg)" step="0.01">
+            <input type="text" id="addBomUnit" placeholder="单位 (如: 张、根、台)">
+            <input type="text" id="addBomManufacturer" placeholder="厂家">
+            <textarea id="addBomRemark" placeholder="备注" rows="2"></textarea>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('addBOMModal')">取消</button>
+                <button class="btn btn-primary" onclick="addBOM()">添加</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑BOM物料 -->
+    <div class="modal-overlay" id="editBOMModal">
+        <div class="modal">
+            <h3>✏️ 编辑BOM物料</h3>
+            <input type="hidden" id="editBomId">
+            <input type="text" id="editBomCode" placeholder="代码">
+            <input type="text" id="editBomModel" placeholder="型号">
+            <input type="text" id="editBomName" placeholder="物料名称 *">
+            <input type="number" id="editBomQty" placeholder="数量" min="0">
+            <input type="text" id="editBomMaterial" placeholder="材料">
+            <input type="number" id="editBomUnitWeight" placeholder="单重 (Kg)" step="0.01">
+            <input type="number" id="editBomTotalWeight" placeholder="总重 (Kg)" step="0.01">
+            <input type="text" id="editBomUnit" placeholder="单位">
+            <input type="text" id="editBomManufacturer" placeholder="厂家">
+            <textarea id="editBomRemark" placeholder="备注" rows="2"></textarea>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('editBOMModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEditBOM()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加库存物料 -->
+    <div class="modal-overlay" id="addInvModal">
+        <div class="modal">
+            <h3>➕ 添加库存物料</h3>
+            <input type="text" id="addInvCode" placeholder="物料编码 * (如: INV001)">
+            <input type="text" id="addInvName" placeholder="物料名称 *">
+            <input type="text" id="addInvSpec" placeholder="规格">
+            <input type="text" id="addInvCategory" placeholder="类别">
+            <input type="text" id="addInvMaterial" placeholder="材质">
+            <input type="text" id="addInvUnit" placeholder="单位 (如: 张、根、台)">
+            <input type="number" id="addInvQty" placeholder="当前库存 *" min="0">
+            <input type="number" id="addInvMin" placeholder="安全库存" min="0" value="10">
+            <input type="number" id="addInvMax" placeholder="最大库存" min="0">
+            <input type="number" id="addInvPrice" placeholder="单价 (元)" step="0.01">
+            <input type="text" id="addInvLocation" placeholder="库位 (如: A区-01-03)">
+            <textarea id="addInvRemark" placeholder="备注" rows="2"></textarea>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('addInvModal')">取消</button>
+                <button class="btn btn-primary" onclick="addInventory()">添加</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑库存物料 -->
+    <div class="modal-overlay" id="editInvModal">
+        <div class="modal">
+            <h3>✏️ 编辑库存物料</h3>
+            <input type="hidden" id="editInvId">
+            <input type="text" id="editInvCode" placeholder="物料编码">
+            <input type="text" id="editInvName" placeholder="物料名称 *">
+            <input type="text" id="editInvSpec" placeholder="规格">
+            <input type="text" id="editInvCategory" placeholder="类别">
+            <input type="text" id="editInvMaterial" placeholder="材质">
+            <input type="text" id="editInvUnit" placeholder="单位">
+            <input type="number" id="editInvQty" placeholder="当前库存 *" min="0">
+            <input type="number" id="editInvMin" placeholder="安全库存" min="0">
+            <input type="number" id="editInvMax" placeholder="最大库存" min="0">
+            <input type="number" id="editInvPrice" placeholder="单价 (元)" step="0.01">
+            <input type="text" id="editInvLocation" placeholder="库位">
+            <textarea id="editInvRemark" placeholder="备注" rows="2"></textarea>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('editInvModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEditInventory()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加人员 -->
+    <div class="modal-overlay" id="addStaffModal">
+        <div class="modal">
+            <h3>➕ 添加人员</h3>
+            <input type="text" id="addStaffName" placeholder="员工姓名 *">
+            <select id="addStaffDept">
+                <option value="管理部">管理部</option>
+                <option value="销售部">销售部</option>
+                <option value="技术部">技术部</option>
+                <option value="生产部">生产部</option>
+                <option value="质检部">质检部</option>
+                <option value="采购部">采购部</option>
+                <option value="仓库">仓库</option>
+            </select>
+            <input type="text" id="addStaffRole" placeholder="职位 * (如: 工程师、经理)">
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('addStaffModal')">取消</button>
+                <button class="btn btn-primary" onclick="addStaff()">添加</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑人员 -->
+    <div class="modal-overlay" id="editStaffModal">
+        <div class="modal">
+            <h3>✏️ 编辑人员</h3>
+            <input type="hidden" id="editStaffId">
+            <input type="text" id="editStaffName" placeholder="姓名 *">
+            <select id="editStaffDept">
+                <option value="管理部">管理部</option>
+                <option value="销售部">销售部</option>
+                <option value="技术部">技术部</option>
+                <option value="生产部">生产部</option>
+                <option value="质检部">质检部</option>
+                <option value="采购部">采购部</option>
+                <option value="仓库">仓库</option>
+            </select>
+            <input type="text" id="editStaffRole" placeholder="职位 *">
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('editStaffModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEditStaff()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 修改密码 -->
+    <div class="modal-overlay" id="changePasswordModal">
+        <div class="modal">
+            <h3>🔑 修改密码</h3>
+            <input type="password" id="oldPassword" placeholder="当前密码">
+            <input type="password" id="newPassword" placeholder="新密码">
+            <input type="password" id="confirmPassword" placeholder="确认新密码">
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('changePasswordModal')">取消</button>
+                <button class="btn btn-primary" onclick="changePassword()">确认</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 删除确认 -->
+    <div class="modal-overlay" id="deleteConfirmModal">
+        <div class="modal">
+            <h3>⚠️ 确认删除</h3>
+            <p id="deleteConfirmText" style="margin-bottom:20px;color:var(--gray);"></p>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('deleteConfirmModal')">取消</button>
+                <button class="btn btn-danger" id="deleteConfirmBtn">删除</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 导入数据 -->
+    <input type="file" id="importAllFile" accept=".json" style="display:none;" onchange="doImportAllData(this)">
+
+    <script>
+        // ============ 演示数据 ============
+        const USERS_DATA = [
+            {id:1, name:'张总', dept:'管理部', role:'总经理'},
+            {id:2, name:'李经理', dept:'管理部', role:'经理'},
+            {id:3, name:'王工', dept:'技术部', role:'工程师'},
+            {id:4, name:'刘工', dept:'技术部', role:'工程师'},
+            {id:5, name:'陈工', dept:'生产部', role:'主管'},
+            {id:6, name:'杨工', dept:'生产部', role:'工人'},
+            {id:7, name:'赵工', dept:'质检部', role:'质检员'},
+            {id:8, name:'周工', dept:'质检部', role:'质检员'},
+            {id:9, name:'吴工', dept:'销售部', role:'销售员'},
+            {id:10, name:'郑工', dept:'采购部', role:'采购员'},
+            {id:11, name:'孙工', dept:'仓库', role:'仓管'},
+            {id:12, name:'钱工', dept:'技术部', role:'工程师'}
+        ];
+        
+        const PROCESSES = [
+            {id:0, name:'机壳拼焊', icon:'🔧', dept:'技术部'},
+            {id:1, name:'底座拼焊', icon:'🔩', dept:'技术部'},
+            {id:2, name:'机壳底座焊接', icon:'⚡', dept:'生产部'},
+            {id:3, name:'叶轮拼焊', icon:'🔩', dept:'技术部'},
+            {id:4, name:'叶轮焊接', icon:'⚡', dept:'技术部'},
+            {id:5, name:'喷砂油漆', icon:'🎨', dept:'生产部'},
+            {id:6, name:'风机组装', icon:'🔧', dept:'生产部'},
+            {id:7, name:'测试出厂', icon:'✅', dept:'质检部'}
+        ];
+        
+        const QC_ITEMS = [
+            {id:0, name:'来料检验', icon:'📥', condition:'bom'},
+            {id:1, name:'加工检验', icon:'🔧', condition:'process:4'},
+            {id:2, name:'装配检验', icon:'🔩', condition:'process:6'},
+            {id:3, name:'性能测试', icon:'⚡', condition:'process:6+qc:2'},
+            {id:4, name:'油漆检验', icon:'🎨', condition:'process:5'},
+            {id:5, name:'终检', icon:'✅', condition:'all'}
+        ];
+        
+        // BOM示例数据（符合用户要求的字段）
+        const BOM_DATA = [
+            {id:'BOM001', code:'FAN-001', model:'BH53M21226', name:'叶片', qty:1, material:'铝合金', unitWeight:25.5, totalWeight:25.5, unit:'片', manufacturer:'自产', remark:'标准叶片', status:'enough', changes:['','','','']},
+            {id:'BOM002', code:'FAN-002', model:'BH53M21226', name:'轮毂', qty:1, material:'铸铁', unitWeight:18.2, totalWeight:18.2, unit:'个', manufacturer:'自产', remark:'', status:'enough', changes:['','','','']},
+            {id:'BOM003', code:'FAN-003', model:'BH53M21226', name:'轴承', qty:2, material:'轴承钢', unitWeight:2.5, totalWeight:5, unit:'套', manufacturer:'SKF', remark:'22218', status:'enough', changes:['','','','']},
+            {id:'BOM004', code:'FAN-004', model:'BH53M21226', name:'电机', qty:1, material:'', unitWeight:150, totalWeight:150, unit:'台', manufacturer:'西门子', remark:'11kW', status:'enough', changes:['','','','']},
+            {id:'BOM005', code:'FAN-005', model:'BH53M21226', name:'机壳', qty:1, material:'Q235', unitWeight:80, totalWeight:80, unit:'个', manufacturer:'自产', remark:'', status:'enough', changes:['','','','']}
+        ];
+        
+        // 库存示例数据（符合用户要求的字段）
+        const INVENTORY_DATA = [
+            {id:'INV001', name:'钢板 Q235 6mm', spec:'6mm×1500×6000', category:'板材', material:'Q235', qty:120, min:50, max:200, unit:'张', price:580, location:'A区-01-01', remark:'', status:'enough', changes:['','','','']},
+            {id:'INV002', name:'角钢 L50×5', spec:'50×50×5mm', category:'型材', material:'Q235', qty:85, min:30, max:150, unit:'根', price:45, location:'A区-01-02', remark:'', status:'enough', changes:['','','','']},
+            {id:'INV003', name:'轴承 SKF 22218', spec:'22218CC/W33', category:'标准件', material:'轴承钢', qty:8, min:10, max:30, unit:'套', price:680, location:'B区-02-01', remark:'SKF原装进口', status:'low', changes:['','','','']},
+            {id:'INV004', name:'电机 Y160M-4', spec:'11kW/4P', category:'电机', material:'', qty:18, min:5, max:20, unit:'台', price:2800, location:'C区-01-01', remark:'含安装附件', status:'enough', changes:['','','','']},
+            {id:'INV005', name:'三角带 B2500', spec:'B2500', category:'传动件', material:'橡胶', qty:150, min:50, max:200, unit:'条', price:28, location:'B区-03-01', remark:'', status:'enough', changes:['','','','']},
+            {id:'INV006', name:'螺栓 M16×60', spec:'M16×60 8.8级', category:'紧固件', material:'45#钢', qty:500, min:200, max:1000, unit:'套', price:3.5, location:'B区-04-01', remark:'含螺母垫片', status:'enough', changes:['','','','']},
+            {id:'INV007', name:'油漆 防锈环氧', spec:'环氧富锌底漆', category:'涂料', material:'环氧树脂', qty:45, min:50, max:100, unit:'kg', price:35, location:'D区-01-01', remark:'灰白色', status:'low', changes:['','','','']},
+            {id:'INV008', name:'密封胶 硅酮', spec:'硅酮密封胶', category:'辅材', material:'硅酮', qty:50, min:20, max:100, unit:'支', price:15, location:'D区-02-01', remark:'', status:'enough', changes:['','','','']},
+            {id:'INV009', name:'焊接材料 J422', spec:'Φ3.2/Φ4.0', category:'焊接材料', material:'碳钢', qty:0, min:30, max:100, unit:'kg', price:12, location:'D区-03-01', remark:'电焊条', status:'out', changes:['','','','']},
+            {id:'INV010', name:'润滑油 L-AN46', spec:'L-AN46', category:'润滑剂', material:'矿物油', qty:30, min:15, max:50, unit:'桶', price:85, location:'D区-04-01', remark:'18L/桶', status:'enough', changes:['','','','']}
+        ];
+        
+        // 订单数据
+        const today = new Date();
+        const ORDERS_DATA = [
+            {id:'BF0426N546A', customer:'玖龙纸业', model:'BL61-S4900', qty:2, delivery:new Date(today.getTime()+30*86400000).toISOString().split('T')[0], status:'production', processes:[true,true,true,true,true,false,false,false], qc:[true,true,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF0426N545A', customer:'山东金锣', model:'BL60-S3200', qty:1, delivery:new Date(today.getTime()+25*86400000).toISOString().split('T')[0], status:'production', processes:[true,true,true,false,false,false,false,false], qc:[true,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF0326N539A', customer:'宁波亚洲', model:'BL61-S3300', qty:2, delivery:new Date(today.getTime()-12*86400000).toISOString().split('T')[0], status:'overdue', processes:[true,true,true,true,true,true,false,false], qc:[true,true,true,false,false,false], created:new Date().toISOString()},
+            {id:'BF0326N538A', customer:'武汉裕大', model:'BL50-S2100', qty:1, delivery:new Date(today.getTime()+45*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF0326N537A', customer:'苏州恒力', model:'BL61-S4500', qty:3, delivery:new Date(today.getTime()+60*86400000).toISOString().split('T')[0], status:'qc', processes:[true,true,true,true,true,true,true,true], qc:[true,true,true,true,true,false], created:new Date().toISOString()},
+            {id:'BF0226N536A', customer:'南通恒科', model:'BL61-S4900', qty:2, delivery:new Date(today.getTime()-38*86400000).toISOString().split('T')[0], status:'overdue', processes:[true,true,true,true,true,true,false,false], qc:[true,true,true,false,false,false], created:new Date().toISOString()},
+            {id:'BF0226N535A', customer:'江西晨鸣', model:'BL60-S2800', qty:1, delivery:new Date(today.getTime()+90*86400000).toISOString().split('T')[0], status:'completed', processes:[true,true,true,true,true,true,true,true], qc:[true,true,true,true,true,true], created:new Date().toISOString()},
+            {id:'BF0126N532A', customer:'天津锦祥', model:'BL50-S1800', qty:2, delivery:new Date(today.getTime()+120*86400000).toISOString().split('T')[0], status:'completed', processes:[true,true,true,true,true,true,true,true], qc:[true,true,true,true,true,true], created:new Date().toISOString()},
+            {id:'BF1225N530A', customer:'江苏博汇', model:'BL61-S5200', qty:1, delivery:new Date(today.getTime()+15*86400000).toISOString().split('T')[0], status:'production', processes:[true,true,true,true,false,false,false,false], qc:[true,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF1225N529A', customer:'重庆理文', model:'BL60-S3500', qty:2, delivery:new Date(today.getTime()+35*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF1125N525A', customer:'河北华泰', model:'BL61-S4800', qty:1, delivery:new Date(today.getTime()+50*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF1125N524A', customer:'福建联盛', model:'BL50-S2000', qty:3, delivery:new Date(today.getTime()+75*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()}
+        ];
+        
+        // ============ 全局变量 ============
+        const STORAGE_KEY = 'buffalo_app_v7';
+        let currentUser = null;
+        let currentPage = 'home';
+        let currentOrder = null;
+        let currentFilter = 'all';
+        let invTab = 'list';
+        let deleteCallback = null;
+        
+        // ============ 数据持久化 ============
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                window.USERS = data.users || [...USERS_DATA];
+                window.ORDERS = data.orders || [...ORDERS_DATA];
+                window.BOM = data.bom || [...BOM_DATA];
+                window.INVENTORY = data.inventory || [...INVENTORY_DATA];
+                window.INV_LOGS = data.invLogs || [];
+                window.PASSWORDS = data.passwords || {default: '123456'};
+            } else {
+                window.USERS = [...USERS_DATA];
+                window.ORDERS = [...ORDERS_DATA];
+                window.BOM = [...BOM_DATA];
+                window.INVENTORY = [...INVENTORY_DATA];
+                window.INV_LOGS = [];
+                window.PASSWORDS = {default: '123456'};
+            }
+        }
+        
+        function saveData() {
+            const data = {
+                users: window.USERS,
+                orders: window.ORDERS,
+                bom: window.BOM,
+                inventory: window.INVENTORY,
+                invLogs: window.INV_LOGS,
+                passwords: window.PASSWORDS
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+        
+        function resetAllData() {
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem('buffalo_current_user_v7');
+            location.reload();
+        }
+        
+        // ============ 初始化 ============
+        function init() {
+            loadData();
+            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('zh-CN', {month:'short', day:'numeric'});
+            
+            const select = document.getElementById('userSelect');
+            window.USERS.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = `${u.name} (${u.dept})`;
+                select.appendChild(opt);
+            });
+            
+            const savedUser = localStorage.getItem('buffalo_current_user_v7');
+            if (savedUser) {
+                const userData = JSON.parse(savedUser);
+                currentUser = window.USERS.find(u => u.id === userData.id);
+                if (currentUser) {
+                    showMainApp();
+                    return;
+                }
+            }
+        }
+        
+        // ============ 登录 ============
+        function login() {
+            const userId = document.getElementById('userSelect').value;
+            const password = document.getElementById('passwordInput').value;
+            
+            if (!userId) { showToast('请选择账号', 'error'); return; }
+            if (!password) { showToast('请输入密码', 'error'); return; }
+            
+            const user = window.USERS.find(u => u.id == userId);
+            if (!user) { showToast('用户不存在', 'error'); return; }
+            
+            const storedPass = window.PASSWORDS[userId] || '123456';
+            if (password !== storedPass) { showToast('密码错误', 'error'); return; }
+            
+            currentUser = user;
+            localStorage.setItem('buffalo_current_user_v7', JSON.stringify({id: user.id, name: user.name}));
+            showMainApp();
+        }
+        
+        function logout() {
+            localStorage.removeItem('buffalo_current_user_v7');
+            location.reload();
+        }
+        
+        function showMainApp() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('mainApp').classList.add('active');
+            document.getElementById('currentUser').textContent = currentUser.name;
+            document.getElementById('currentDept').textContent = currentUser.dept + ' · ' + currentUser.role;
+            document.getElementById('profileName').textContent = currentUser.name;
+            document.getElementById('profileDept').textContent = currentUser.dept + ' · ' + currentUser.role;
+            document.getElementById('profileAvatar').textContent = currentUser.name.slice(-2);
+            
+            // 控制新建订单按钮显示
+            const addOrderBtn = document.getElementById('addOrderBtn');
+            if (['管理部','销售部','技术部'].includes(currentUser.dept)) {
+                addOrderBtn.style.display = 'block';
+            } else {
+                addOrderBtn.style.display = 'none';
+            }
+            
+            // 控制添加人员按钮显示
+            const addStaffBtn = document.getElementById('addStaffBtn');
+            if (currentUser.dept === '管理部') {
+                addStaffBtn.style.display = 'block';
+            } else {
+                addStaffBtn.style.display = 'none';
+            }
+            
+            renderHome();
+            renderMessages();
+        }
+        
+        // ============ 页面导航 ============
+        function showTab(tab, navBtn) {
+            currentPage = tab;
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + tab).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            if (navBtn) navBtn.classList.add('active');
+            else {
+                document.querySelectorAll('.nav-item').forEach(n => {
+                    if ((tab === 'home' && n.querySelector('.nav-label').textContent === '首页') ||
+                        (tab === 'orders' && n.querySelector('.nav-label').textContent === '项目') ||
+                        (tab === 'bom' && n.querySelector('.nav-label').textContent === 'BOM') ||
+                        (tab === 'inventory' && n.querySelector('.nav-label').textContent === '库存') ||
+                        (tab === 'profile' && n.querySelector('.nav-label').textContent === '我的')) {
+                        n.classList.add('active');
+                    }
+                });
+            }
+            
+            if (tab === 'home') renderHome();
+            if (tab === 'orders') renderOrders();
+            if (tab === 'bom') renderBOM();
+            if (tab === 'inventory') renderInventory();
+            if (tab === 'staff') renderStaff();
+            if (tab === 'messages') renderMessages();
+        }
+        
+        // ============ 首页 ============
+        function renderHome() {
+            const orders = window.ORDERS || [];
+            const total = orders.length;
+            const production = orders.filter(o => o.status === 'production' || o.status === 'qc').length;
+            const completed = orders.filter(o => o.status === 'completed').length;
+            const overdue = orders.filter(o => o.status === 'overdue').length;
+            
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statProduction').textContent = production;
+            document.getElementById('statCompleted').textContent = completed;
+            document.getElementById('statOverdue').textContent = overdue;
+            
+            // 在产项目
+            const prodOrders = orders.filter(o => ['production','qc','pending'].includes(o.status)).slice(0, 3);
+            const container = document.getElementById('productionOrders');
+            
+            if (prodOrders.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无在产项目</p></div>';
+            } else {
+                container.innerHTML = prodOrders.map(o => createOrderCard(o)).join('');
+            }
+            
+            // 消息数量
+            const messages = getMessages();
+            const badge = document.getElementById('msgBadge');
+            if (messages.length > 0) {
+                badge.style.display = 'block';
+                badge.textContent = messages.length;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        function createOrderCard(order) {
+            const completedSteps = order.processes.filter(p => p).length;
+            const progress = (completedSteps / 8 * 100).toFixed(0);
+            const statusText = {pending:'待生产',production:'生产中',qc:'质检中',completed:'已完成',overdue:'已逾期'};
+            const statusClass = order.status;
+            
+            return `
+                <div class="order-card status-${statusClass}" onclick="showOrderDetail('${order.id}')">
+                    <div class="order-header">
+                        <div>
+                            <div class="order-id">${order.id}</div>
+                            <div class="order-name">${order.customer} · ${order.model}</div>
+                        </div>
+                        <span class="order-badge badge-${statusClass}">${statusText[order.status]}</span>
+                    </div>
+                    <div class="order-progress">
+                        <div class="order-progress-bar" style="width:${progress}%"></div>
+                    </div>
+                    <div class="order-meta">
+                        <span>数量: ${order.qty}</span>
+                        <span>交货: ${order.delivery}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ============ 项目列表 ============
+        function renderOrders() {
+            const orders = window.ORDERS || [];
+            let filtered = orders;
+            
+            if (currentFilter !== 'all') {
+                filtered = orders.filter(o => o.status === currentFilter);
+            }
+            
+            const container = document.getElementById('ordersList');
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无订单</p></div>';
+            } else {
+                container.innerHTML = filtered.map(o => createOrderCard(o)).join('');
+            }
+        }
+        
+        function filterOrders(filter, btn) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderOrders();
+        }
+        
+        function searchOrders() {
+            const keyword = document.getElementById('orderSearch').value.toLowerCase();
+            const orders = window.ORDERS || [];
+            const filtered = orders.filter(o => 
+                o.id.toLowerCase().includes(keyword) || 
+                o.customer.toLowerCase().includes(keyword) ||
+                o.model.toLowerCase().includes(keyword)
+            );
+            
+            const container = document.getElementById('ordersList');
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>未找到匹配订单</p></div>';
+            } else {
+                container.innerHTML = filtered.map(o => createOrderCard(o)).join('');
+            }
+        }
+        
+        // ============ 项目详情 ============
+        function showOrderDetail(orderId) {
+            const order = window.ORDERS.find(o => o.id === orderId);
+            if (!order) return;
+            currentOrder = order;
+            
+            const statusText = {pending:'待生产',production:'生产中',qc:'质检中',completed:'已完成',overdue:'已逾期'};
+            
+            // 基本信息
+            document.getElementById('orderDetail').innerHTML = `
+                <div class="detail-header">
+                    <div class="detail-title">${order.id}</div>
+                    <span class="order-badge badge-${order.status}">${statusText[order.status]}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div><span style="color:var(--gray);font-size:12px;">客户</span><div style="font-weight:500;">${order.customer}</div></div>
+                    <div><span style="color:var(--gray);font-size:12px;">型号</span><div style="font-weight:500;">${order.model}</div></div>
+                    <div><span style="color:var(--gray);font-size:12px;">数量</span><div style="font-weight:500;">${order.qty}</div></div>
+                    <div><span style="color:var(--gray);font-size:12px;">交货日期</span><div style="font-weight:500;">${order.delivery}</div></div>
+                </div>
+                <div style="margin-top:15px;display:flex;gap:8px;">
+                    <button class="btn btn-secondary btn-sm" onclick="showEditOrderModal('${order.id}')">✏️ 编辑</button>
+                    ${currentUser.dept === '管理部' ? `<button class="btn btn-danger btn-sm" onclick="deleteOrder('${order.id}')">🗑️ 删除</button>` : ''}
+                </div>
+            `;
+            
+            // 工序时间线
+            let canEditProcess = currentUser.dept === '管理部' || currentUser.dept === '生产部' || currentUser.dept === '技术部';
+            let processHtml = '<h4 style="margin-bottom:15px;">⚙️ 工序进度</h4><div class="process-timeline">';
+            
+            PROCESSES.forEach((p, idx) => {
+                const completed = order.processes[idx];
+                let className = completed ? 'completed' : (idx === order.processes.findIndex((v,i) => !v && i <= idx) ? 'current' : '');
+                let clickHandler = canEditProcess ? `onclick="toggleProcess(${idx})"` : '';
+                
+                processHtml += `
+                    <div class="timeline-item ${className}">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content ${className}" ${clickHandler}>
+                            <div class="timeline-title">${p.icon} ${p.name}</div>
+                            <div class="timeline-meta">负责部门: ${p.dept}</div>
+                            ${completed ? `<div class="timeline-operator">✓ 已完成</div>` : `<div class="timeline-operator">点击标记完成</div>`}
+                        </div>
+                    </div>
+                `;
+            });
+            processHtml += '</div>';
+            document.getElementById('processSection').innerHTML = processHtml;
+            
+            // 甘特图
+            const ganttHtml = `
+                <h4 style="margin-bottom:15px;">📊 甘特图</h4>
+                <div class="gantt-container">
+                    ${PROCESSES.map((p, idx) => {
+                        const completed = order.processes[idx];
+                        return `
+                            <div class="gantt-row">
+                                <div class="gantt-label">${p.name}</div>
+                                <div class="gantt-bar-container">
+                                    ${completed ? `<div class="gantt-bar completed" style="left:0;width:100%;"></div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            document.getElementById('ganttSection').innerHTML = ganttHtml;
+            
+            // QC节点
+            const qcHtml = `
+                <h4 style="margin-bottom:15px;">🔍 QC质检节点</h4>
+                <div class="qc-grid">
+                    ${QC_ITEMS.map((q, idx) => {
+                        let qcStatus = 'pending';
+                        if (order.qc[idx]) qcStatus = 'pass';
+                        
+                        return `
+                            <div class="qc-item ${qcStatus}">
+                                <div class="qc-icon">${q.icon}</div>
+                                <div class="qc-name">${q.name}</div>
+                                <div class="qc-status ${qcStatus}">${qcStatus === 'pass' ? '✓ 通过' : '○ 待检'}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            document.getElementById('qcSection').innerHTML = qcHtml;
+            
+            showTab('detail');
+        }
+        
+        function toggleProcess(idx) {
+            if (!currentOrder) return;
+            currentOrder.processes[idx] = !currentOrder.processes[idx];
+            
+            // 更新状态
+            const allCompleted = currentOrder.processes.every(p => p);
+            const anyInProgress = currentOrder.processes.some(p => p);
+            const qcDone = currentOrder.qc.every(q => q);
+            
+            if (allCompleted && qcDone) {
+                currentOrder.status = 'completed';
+            } else if (anyInProgress) {
+                currentOrder.status = 'production';
+            } else {
+                currentOrder.status = 'pending';
+            }
+            
+            // 检查逾期
+            const today = new Date();
+            const delivery = new Date(currentOrder.delivery);
+            if (currentOrder.status !== 'completed' && delivery < today) {
+                currentOrder.status = 'overdue';
+            }
+            
+            saveData();
+            showOrderDetail(currentOrder.id);
+        }
+        
+        // ============ 订单管理 ============
+        function showAddOrderModal() {
+            document.getElementById('addOrderId').value = '';
+            document.getElementById('addOrderCustomer').value = '';
+            document.getElementById('addOrderModel').value = '';
+            document.getElementById('addOrderQty').value = '1';
+            document.getElementById('addOrderDelivery').value = '';
+            document.getElementById('addOrderModal').classList.add('active');
+        }
+        
+        function addOrder() {
+            const id = document.getElementById('addOrderId').value.trim();
+            const customer = document.getElementById('addOrderCustomer').value.trim();
+            const model = document.getElementById('addOrderModel').value.trim();
+            const qty = parseInt(document.getElementById('addOrderQty').value) || 1;
+            const delivery = document.getElementById('addOrderDelivery').value;
+            
+            if (!id || !customer || !model) {
+                showToast('请填写必填字段', 'error');
+                return;
+            }
+            
+            if (window.ORDERS.find(o => o.id === id)) {
+                showToast('订单号已存在', 'error');
+                return;
+            }
+            
+            const newOrder = {
+                id, customer, model, qty, delivery,
+                status: 'pending',
+                processes: Array(8).fill(false),
+                qc: Array(6).fill(false),
+                created: new Date().toISOString()
+            };
+            
+            window.ORDERS.push(newOrder);
+            saveData();
+            closeModal('addOrderModal');
+            showToast('订单创建成功', 'success');
+            renderOrders();
+            renderHome();
+        }
+        
+        function showEditOrderModal(orderId) {
+            const order = window.ORDERS.find(o => o.id === orderId);
+            if (!order) return;
+            
+            document.getElementById('editOrderId').value = orderId;
+            document.getElementById('editOrderNum').value = order.id;
+            document.getElementById('editOrderCustomer').value = order.customer;
+            document.getElementById('editOrderModel').value = order.model;
+            document.getElementById('editOrderQty').value = order.qty;
+            document.getElementById('editOrderDelivery').value = order.delivery;
+            document.getElementById('editOrderStatus').value = order.status;
+            document.getElementById('editOrderModal').classList.add('active');
+        }
+        
+        function saveEditOrder() {
+            const orderId = document.getElementById('editOrderId').value;
+            const order = window.ORDERS.find(o => o.id === orderId);
+            if (!order) return;
+            
+            const newStatus = document.getElementById('editOrderStatus').value;
+            
+            // 完工状态保护逻辑
+            if (newStatus === 'completed' && order.status !== 'completed') {
+                // 检查是否满足完工条件
+                const allProcessesDone = order.processes.every(p => p);
+                const allQCDone = order.qc.every(q => q);
+                
+                if (!allProcessesDone) {
+                    showToast('所有工序未完成，不能设为完工状态', 'error');
+                    return;
+                }
+                if (!allQCDone) {
+                    showToast('所有QC节点未通过，不能设为完工状态', 'error');
+                    return;
+                }
+            }
+            
+            order.id = document.getElementById('editOrderNum').value.trim();
+            order.customer = document.getElementById('editOrderCustomer').value.trim();
+            order.model = document.getElementById('editOrderModel').value.trim();
+            order.qty = parseInt(document.getElementById('editOrderQty').value) || 1;
+            order.delivery = document.getElementById('editOrderDelivery').value;
+            order.status = newStatus;
+            
+            saveData();
+            closeModal('editOrderModal');
+            showToast('订单已保存', 'success');
+            renderOrders();
+            renderHome();
+            
+            if (currentOrder && currentOrder.id === orderId) {
+                showOrderDetail(order.id);
+            }
+        }
+        
+        function deleteOrder(orderId) {
+            const order = window.ORDERS.find(o => o.id === orderId);
+            if (!order) return;
+            
+            document.getElementById('deleteConfirmText').textContent = `确定要删除订单 "${order.id}" 吗？`;
+            deleteCallback = () => {
+                const idx = window.ORDERS.findIndex(o => o.id === orderId);
+                if (idx !== -1) {
+                    window.ORDERS.splice(idx, 1);
+                    saveData();
+                    showToast('订单已删除', 'success');
+                    showTab('orders');
+                    renderHome();
+                }
+            };
+            document.getElementById('deleteConfirmModal').classList.add('active');
+            document.getElementById('deleteConfirmBtn').onclick = () => {
+                closeModal('deleteConfirmModal');
+                if (deleteCallback) deleteCallback();
+            };
+        }
+        
+        // ============ BOM管理 ============
+        function renderBOM() {
+            const tbody = document.getElementById('bomTableBody');
+            const bom = window.BOM || [];
+            
+            if (bom.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--gray);">暂无BOM数据，请添加或导入</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = bom.map((item, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${item.code || ''}</td>
+                    <td>${item.model || ''}</td>
+                    <td>${item.name}</td>
+                    <td>${item.qty} ${item.unit || ''}</td>
+                    <td>${item.material || ''}</td>
+                    <td>${item.unitWeight || ''}</td>
+                    <td>${item.totalWeight || ''}</td>
+                    <td><span class="bom-badge ${item.status || 'enough'}">${item.status === 'enough' ? '充足' : (item.status === 'low' ? '偏低' : '缺货')}</span></td>
+                    <td>
+                        <button class="btn-icon btn-secondary" onclick="showEditBOMModal('${item.id}')" title="编辑">✏️</button>
+                        <button class="btn-icon btn-danger" onclick="deleteBOM('${item.id}')" title="删除">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function showAddBOMModal() {
+            document.getElementById('addBomCode').value = 'BOM' + String((window.BOM?.length || 0) + 1).padStart(3, '0');
+            ['addBomModel','addBomName','addBomQty','addBomMaterial','addBomUnitWeight','addBomTotalWeight','addBomUnit','addBomManufacturer','addBomRemark'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('addBOMModal').classList.add('active');
+        }
+        
+        function addBOM() {
+            const name = document.getElementById('addBomName').value.trim();
+            if (!name) {
+                showToast('请填写物料名称', 'error');
+                return;
+            }
+            
+            const newBOM = {
+                id: 'BOM' + Date.now(),
+                code: document.getElementById('addBomCode').value.trim(),
+                model: document.getElementById('addBomModel').value.trim(),
+                name,
+                qty: parseInt(document.getElementById('addBomQty').value) || 0,
+                material: document.getElementById('addBomMaterial').value.trim(),
+                unitWeight: parseFloat(document.getElementById('addBomUnitWeight').value) || 0,
+                totalWeight: parseFloat(document.getElementById('addBomTotalWeight').value) || 0,
+                unit: document.getElementById('addBomUnit').value.trim(),
+                manufacturer: document.getElementById('addBomManufacturer').value.trim(),
+                remark: document.getElementById('addBomRemark').value.trim(),
+                status: 'enough',
+                changes: ['','','','']
+            };
+            
+            window.BOM.push(newBOM);
+            saveData();
+            closeModal('addBOMModal');
+            showToast('BOM物料添加成功', 'success');
+            renderBOM();
+        }
+        
+        function showEditBOMModal(id) {
+            const item = window.BOM.find(b => b.id === id);
+            if (!item) return;
+            
+            document.getElementById('editBomId').value = id;
+            document.getElementById('editBomCode').value = item.code || '';
+            document.getElementById('editBomModel').value = item.model || '';
+            document.getElementById('editBomName').value = item.name;
+            document.getElementById('editBomQty').value = item.qty;
+            document.getElementById('editBomMaterial').value = item.material || '';
+            document.getElementById('editBomUnitWeight').value = item.unitWeight || '';
+            document.getElementById('editBomTotalWeight').value = item.totalWeight || '';
+            document.getElementById('editBomUnit').value = item.unit || '';
+            document.getElementById('editBomManufacturer').value = item.manufacturer || '';
+            document.getElementById('editBomRemark').value = item.remark || '';
+            document.getElementById('editBOMModal').classList.add('active');
+        }
+        
+        function saveEditBOM() {
+            const id = document.getElementById('editBomId').value;
+            const item = window.BOM.find(b => b.id === id);
+            if (!item) return;
+            
+            const name = document.getElementById('editBomName').value.trim();
+            if (!name) {
+                showToast('请填写物料名称', 'error');
+                return;
+            }
+            
+            item.code = document.getElementById('editBomCode').value.trim();
+            item.model = document.getElementById('editBomModel').value.trim();
+            item.name = name;
+            item.qty = parseInt(document.getElementById('editBomQty').value) || 0;
+            item.material = document.getElementById('editBomMaterial').value.trim();
+            item.unitWeight = parseFloat(document.getElementById('editBomUnitWeight').value) || 0;
+            item.totalWeight = parseFloat(document.getElementById('editBomTotalWeight').value) || 0;
+            item.unit = document.getElementById('editBomUnit').value.trim();
+            item.manufacturer = document.getElementById('editBomManufacturer').value.trim();
+            item.remark = document.getElementById('editBomRemark').value.trim();
+            
+            saveData();
+            closeModal('editBOMModal');
+            showToast('BOM物料已保存', 'success');
+            renderBOM();
+        }
+        
+        function deleteBOM(id) {
+            const item = window.BOM.find(b => b.id === id);
+            if (!item) return;
+            
+            document.getElementById('deleteConfirmText').textContent = `确定要删除BOM物料 "${item.name}" 吗？`;
+            deleteCallback = () => {
+                const idx = window.BOM.findIndex(b => b.id === id);
+                if (idx !== -1) {
+                    window.BOM.splice(idx, 1);
+                    saveData();
+                    showToast('BOM物料已删除', 'success');
+                    renderBOM();
+                }
+            };
+            document.getElementById('deleteConfirmModal').classList.add('active');
+            document.getElementById('deleteConfirmBtn').onclick = () => {
+                closeModal('deleteConfirmModal');
+                if (deleteCallback) deleteCallback();
+            };
+        }
+        
+        function exportBOM() {
+            const bom = window.BOM || [];
+            let csv = '\uFEFF序号,代码,型号,名称,数量,材料,单重Kg,总重Kg,单位,厂家,备注,状态\n';
+            bom.forEach((item, i) => {
+                const statusText = item.status === 'enough' ? '充足' : (item.status === 'low' ? '偏低' : '缺货');
+                csv += `${i+1},"${item.code || ''}","${item.model || ''}","${item.name}",${item.qty},"${item.material || ''}",${item.unitWeight || ''},${item.totalWeight || ''},"${item.unit || ''}","${item.manufacturer || ''}","${item.remark || ''}",${statusText}\n`;
+            });
+            
+            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BOM导出_${new Date().toLocaleDateString()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('BOM已导出', 'success');
+        }
+        
+        function importBOMFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split('\n').filter(l => l.trim());
+                    
+                    if (lines.length < 2) {
+                        showToast('CSV文件内容为空或格式不正确', 'error');
+                        return;
+                    }
+                    
+                    // 跳过表头，解析数据
+                    const newItems = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const cols = parseCSVLine(lines[i]);
+                        if (cols.length >= 4) {
+                            newItems.push({
+                                id: 'BOM' + Date.now() + '_' + i,
+                                code: cols[1] || '',
+                                model: cols[2] || '',
+                                name: cols[3] || '',
+                                qty: parseInt(cols[4]) || 0,
+                                material: cols[5] || '',
+                                unitWeight: parseFloat(cols[6]) || 0,
+                                totalWeight: parseFloat(cols[7]) || 0,
+                                unit: cols[8] || '',
+                                manufacturer: cols[9] || '',
+                                remark: cols[10] || '',
+                                status: 'enough',
+                                changes: [cols[11] || '', cols[12] || '', cols[13] || '', cols[14] || '']
+                            });
+                        }
+                    }
+                    
+                    if (newItems.length > 0) {
+                        window.BOM = [...window.BOM, ...newItems];
+                        saveData();
+                        showToast(`成功导入 ${newItems.length} 条BOM数据`, 'success');
+                        renderBOM();
+                    } else {
+                        showToast('未找到有效数据', 'error');
+                    }
+                } catch (err) {
+                    showToast('导入失败：' + err.message, 'error');
+                }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+        
+        // ============ 库存管理 ============
+        function renderInventory(tab) {
+            tab = tab || invTab;
+            const container = document.getElementById('inventoryContent');
+            const inv = window.INVENTORY || [];
+            
+            if (tab === 'list') {
+                container.innerHTML = `
+                    <div class="action-bar">
+                        <button class="btn btn-primary btn-sm" onclick="showAddInvModal()">+ 添加物料</button>
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importInvFile').click()">📥 批量导入</button>
+                        <button class="btn btn-secondary btn-sm" onclick="exportInventory()">📤 导出</button>
+                    </div>
+                    <input type="file" id="importInvFile" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importInvFile(this)">
+                    <div class="import-hint">
+                        <strong>💡 CSV批量导入说明：</strong>
+                        表头顺序：编码,名称,规格,类别,材质,单位,当前库存,安全库存,最大库存,单价,库位,备注<br>
+                        第一行必须为表头，第二行开始为数据
+                    </div>
+                ` + inv.map(item => `
+                    <div class="inv-card">
+                        <div class="inv-header">
+                            <span class="inv-name">${item.name}</span>
+                            <span class="inv-code">${item.id}</span>
+                        </div>
+                        <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">
+                            ${item.spec ? '规格: ' + item.spec + ' | ' : ''}${item.category ? '类别: ' + item.category + ' | ' : ''}${item.material ? '材质: ' + item.material : ''}
+                        </div>
+                        <div class="inv-stats">
+                            <div class="inv-stat ${item.qty < item.min ? 'danger' : (item.qty < item.min * 1.5 ? 'warning' : '')}">
+                                <div class="num">${item.qty}</div>
+                                <div class="label">当前库存</div>
+                            </div>
+                            <div class="inv-stat">
+                                <div class="num">${item.min}</div>
+                                <div class="label">安全库存</div>
+                            </div>
+                            <div class="inv-stat">
+                                <div class="num">${item.unit}</div>
+                                <div class="label">单位</div>
+                            </div>
+                            <div class="inv-stat">
+                                <div class="num">${item.price ? '¥' + item.price : '-'}</div>
+                                <div class="label">单价</div>
+                            </div>
+                        </div>
+                        <div style="font-size:11px;color:var(--gray);margin-top:8px;">
+                            ${item.location ? '📍 ' + item.location : ''}${item.remark ? ' | ' + item.remark : ''}
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:8px;">
+                            <button class="btn btn-sm btn-secondary" onclick="showEditInvModal('${item.id}')">✏️ 编辑</button>
+                            <button class="btn btn-sm btn-secondary" onclick="doInStockOne('${item.id}')">📥 入库</button>
+                            <button class="btn btn-sm btn-secondary" onclick="doOutStockOne('${item.id}')">📤 出库</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteInventory('${item.id}')">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else if (tab === 'in') {
+                container.innerHTML = `
+                    <div class="inv-card">
+                        <h4 style="margin-bottom:15px;">📥 入库操作</h4>
+                        <div class="form-group">
+                            <label>选择物料</label>
+                            <select id="invInSelect">
+                                ${inv.map(i => `<option value="${i.id}">${i.name} (当前: ${i.qty} ${i.unit})</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>入库数量</label>
+                            <input type="number" id="invInQty" placeholder="输入数量" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>备注（可选）</label>
+                            <input type="text" id="invInRemark" placeholder="入库备注">
+                        </div>
+                        <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="doInStock()">确认入库</button>
+                    </div>
+                `;
+            } else if (tab === 'out') {
+                container.innerHTML = `
+                    <div class="inv-card">
+                        <h4 style="margin-bottom:15px;">📤 出库操作</h4>
+                        <div class="form-group">
+                            <label>选择物料</label>
+                            <select id="invOutSelect">
+                                ${inv.map(i => `<option value="${i.id}">${i.name} (当前: ${i.qty} ${i.unit})</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>出库数量</label>
+                            <input type="number" id="invOutQty" placeholder="输入数量" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>备注（可选）</label>
+                            <input type="text" id="invOutRemark" placeholder="出库备注">
+                        </div>
+                        <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="doOutStock()">确认出库</button>
+                    </div>
+                `;
+            } else if (tab === 'logs') {
+                const logs = window.INV_LOGS || [];
+                if (logs.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">📝</div><p>暂无交易记录</p></div>';
+                } else {
+                    container.innerHTML = logs.slice().reverse().map(log => `
+                        <div class="inv-card">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <span style="font-size:20px;">${log.type === 'in' ? '📥' : '📤'}</span>
+                                    <span style="margin-left:10px;font-weight:600;">${log.item}</span>
+                                </div>
+                                <span style="color:${log.type === 'in' ? 'var(--success)' : 'var(--danger)'};font-weight:600;">
+                                    ${log.type === 'in' ? '+' : '-'}${log.qty}
+                                </span>
+                            </div>
+                            <div style="font-size:12px;color:var(--gray);margin-top:8px;">
+                                ${log.remark ? log.remark + ' | ' : ''}${new Date(log.time).toLocaleString('zh-CN')}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+        
+        function switchInvTab(tab, btn) {
+            invTab = tab;
+            document.querySelectorAll('.inv-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            renderInventory(tab);
+        }
+        
+        function showAddInvModal() {
+            document.getElementById('addInvCode').value = 'INV' + String((window.INVENTORY?.length || 0) + 1).padStart(3, '0');
+            ['addInvName','addInvSpec','addInvCategory','addInvMaterial','addInvUnit','addInvQty','addInvMin','addInvMax','addInvPrice','addInvLocation','addInvRemark'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('addInvMin').value = '10';
+            document.getElementById('addInvModal').classList.add('active');
+        }
+        
+        function addInventory() {
+            const name = document.getElementById('addInvName').value.trim();
+            const id = document.getElementById('addInvCode').value.trim();
+            
+            if (!name || !id) {
+                showToast('请填写物料名称和编码', 'error');
+                return;
+            }
+            
+            const newInv = {
+                id,
+                name,
+                spec: document.getElementById('addInvSpec').value.trim(),
+                category: document.getElementById('addInvCategory').value.trim(),
+                material: document.getElementById('addInvMaterial').value.trim(),
+                unit: document.getElementById('addInvUnit').value.trim(),
+                qty: parseInt(document.getElementById('addInvQty').value) || 0,
+                min: parseInt(document.getElementById('addInvMin').value) || 10,
+                max: parseInt(document.getElementById('addInvMax').value) || 0,
+                price: parseFloat(document.getElementById('addInvPrice').value) || 0,
+                location: document.getElementById('addInvLocation').value.trim(),
+                remark: document.getElementById('addInvRemark').value.trim(),
+                status: 'enough',
+                changes: ['','','','']
+            };
+            
+            window.INVENTORY.push(newInv);
+            saveData();
+            closeModal('addInvModal');
+            showToast('库存物料添加成功', 'success');
+            renderInventory('list');
+        }
+        
+        function showEditInvModal(id) {
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (!item) return;
+            
+            document.getElementById('editInvId').value = id;
+            document.getElementById('editInvCode').value = item.id;
+            document.getElementById('editInvName').value = item.name;
+            document.getElementById('editInvSpec').value = item.spec || '';
+            document.getElementById('editInvCategory').value = item.category || '';
+            document.getElementById('editInvMaterial').value = item.material || '';
+            document.getElementById('editInvUnit').value = item.unit || '';
+            document.getElementById('editInvQty').value = item.qty;
+            document.getElementById('editInvMin').value = item.min;
+            document.getElementById('editInvMax').value = item.max || '';
+            document.getElementById('editInvPrice').value = item.price || '';
+            document.getElementById('editInvLocation').value = item.location || '';
+            document.getElementById('editInvRemark').value = item.remark || '';
+            document.getElementById('editInvModal').classList.add('active');
+        }
+        
+        function saveEditInventory() {
+            const id = document.getElementById('editInvId').value;
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (!item) return;
+            
+            const name = document.getElementById('editInvName').value.trim();
+            if (!name) {
+                showToast('请填写物料名称', 'error');
+                return;
+            }
+            
+            item.id = document.getElementById('editInvCode').value.trim();
+            item.name = name;
+            item.spec = document.getElementById('editInvSpec').value.trim();
+            item.category = document.getElementById('editInvCategory').value.trim();
+            item.material = document.getElementById('editInvMaterial').value.trim();
+            item.unit = document.getElementById('editInvUnit').value.trim();
+            item.qty = parseInt(document.getElementById('editInvQty').value) || 0;
+            item.min = parseInt(document.getElementById('editInvMin').value) || 10;
+            item.max = parseInt(document.getElementById('editInvMax').value) || 0;
+            item.price = parseFloat(document.getElementById('editInvPrice').value) || 0;
+            item.location = document.getElementById('editInvLocation').value.trim();
+            item.remark = document.getElementById('editInvRemark').value.trim();
+            
+            saveData();
+            closeModal('editInvModal');
+            showToast('库存物料已保存', 'success');
+            renderInventory('list');
+        }
+        
+        function deleteInventory(id) {
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (!item) return;
+            
+            document.getElementById('deleteConfirmText').textContent = `确定要删除库存物料 "${item.name}" 吗？`;
+            deleteCallback = () => {
+                const idx = window.INVENTORY.findIndex(i => i.id === id);
+                if (idx !== -1) {
+                    window.INVENTORY.splice(idx, 1);
+                    saveData();
+                    showToast('库存物料已删除', 'success');
+                    renderInventory('list');
+                }
+            };
+            document.getElementById('deleteConfirmModal').classList.add('active');
+            document.getElementById('deleteConfirmBtn').onclick = () => {
+                closeModal('deleteConfirmModal');
+                if (deleteCallback) deleteCallback();
+            };
+        }
+        
+        function doInStock() {
+            const id = document.getElementById('invInSelect').value;
+            const qty = parseInt(document.getElementById('invInQty').value) || 0;
+            const remark = document.getElementById('invInRemark').value.trim();
+            
+            if (qty <= 0) {
+                showToast('请输入有效的入库数量', 'error');
+                return;
+            }
+            
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (!item) return;
+            
+            item.qty += qty;
+            window.INV_LOGS.push({
+                type: 'in',
+                item: item.name,
+                qty: qty,
+                remark: remark || '入库',
+                time: Date.now()
+            });
+            
+            saveData();
+            showToast(`入库成功：${item.name} +${qty}`, 'success');
+            renderInventory('list');
+        }
+        
+        function doOutStock() {
+            const id = document.getElementById('invOutSelect').value;
+            const qty = parseInt(document.getElementById('invOutQty').value) || 0;
+            const remark = document.getElementById('invOutRemark').value.trim();
+            
+            if (qty <= 0) {
+                showToast('请输入有效的出库数量', 'error');
+                return;
+            }
+            
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (!item) return;
+            
+            if (item.qty < qty) {
+                showToast('库存不足，当前库存：' + item.qty, 'error');
+                return;
+            }
+            
+            item.qty -= qty;
+            window.INV_LOGS.push({
+                type: 'out',
+                item: item.name,
+                qty: qty,
+                remark: remark || '出库',
+                time: Date.now()
+            });
+            
+            saveData();
+            showToast(`出库成功：${item.name} -${qty}`, 'success');
+            renderInventory('list');
+        }
+        
+        function doInStockOne(id) {
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (!item) return;
+            
+            const qty = prompt(`📥 入库 - "${item.name}"\n当前库存: ${item.qty} ${item.unit}\n请输入入库数量：`, '1');
+            if (qty === null) return;
+            
+            const qtyNum = parseInt(qty);
+            if (isNaN(qtyNum) || qtyNum <= 0) {
+                showToast('请输入有效数量', 'error');
+                return;
+            }
+            
+            item.qty += qtyNum;
+            window.INV_LOGS.push({
+                type: 'in',
+                item: item.name,
+                qty: qtyNum,
+                remark: '快速入库',
+                time: Date.now()
+            });
+            
+            saveData();
+            showToast(`入库成功：${item.name} +${qtyNum}`, 'success');
+            renderInventory('list');
+        }
+        
+        function doOutStockOne(id) {
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (!item) return;
+            
+            const qty = prompt(`📤 出库 - "${item.name}"\n当前库存: ${item.qty} ${item.unit}\n请输入出库数量：`, '1');
+            if (qty === null) return;
+            
+            const qtyNum = parseInt(qty);
+            if (isNaN(qtyNum) || qtyNum <= 0) {
+                showToast('请输入有效数量', 'error');
+                return;
+            }
+            
+            if (item.qty < qtyNum) {
+                showToast('库存不足，当前库存：' + item.qty, 'error');
+                return;
+            }
+            
+            item.qty -= qtyNum;
+            window.INV_LOGS.push({
+                type: 'out',
+                item: item.name,
+                qty: qtyNum,
+                remark: '快速出库',
+                time: Date.now()
+            });
+            
+            saveData();
+            showToast(`出库成功：${item.name} -${qtyNum}`, 'success');
+            renderInventory('list');
+        }
+        
+        function exportInventory() {
+            const inv = window.INVENTORY || [];
+            let csv = '\uFEFF编码,名称,规格,类别,材质,单位,当前库存,安全库存,最大库存,单价,库位,备注\n';
+            inv.forEach(item => {
+                csv += `"${item.id}","${item.name}","${item.spec || ''}","${item.category || ''}","${item.material || ''}","${item.unit || ''}",${item.qty},${item.min},${item.max || ''},${item.price || ''},"${item.location || ''}","${item.remark || ''}"\n`;
+            });
+            
+            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `库存导出_${new Date().toLocaleDateString()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('库存已导出', 'success');
+        }
+        
+        function importInvFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split('\n').filter(l => l.trim());
+                    
+                    if (lines.length < 2) {
+                        showToast('CSV文件内容为空或格式不正确', 'error');
+                        return;
+                    }
+                    
+                    const newItems = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const cols = parseCSVLine(lines[i]);
+                        if (cols.length >= 2) {
+                            newItems.push({
+                                id: cols[0] || 'INV' + Date.now() + '_' + i,
+                                name: cols[1] || '',
+                                spec: cols[2] || '',
+                                category: cols[3] || '',
+                                material: cols[4] || '',
+                                unit: cols[5] || '',
+                                qty: parseInt(cols[6]) || 0,
+                                min: parseInt(cols[7]) || 10,
+                                max: parseInt(cols[8]) || 0,
+                                price: parseFloat(cols[9]) || 0,
+                                location: cols[10] || '',
+                                remark: cols[11] || '',
+                                status: 'enough',
+                                changes: ['','','','']
+                            });
+                        }
+                    }
+                    
+                    if (newItems.length > 0) {
+                        window.INVENTORY = [...window.INVENTORY, ...newItems];
+                        saveData();
+                        showToast(`成功导入 ${newItems.length} 条库存数据`, 'success');
+                        renderInventory('list');
+                    } else {
+                        showToast('未找到有效数据', 'error');
+                    }
+                } catch (err) {
+                    showToast('导入失败：' + err.message, 'error');
+                }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+        
+        // ============ 人员管理 ============
+        function renderStaff() {
+            const container = document.getElementById('deptList');
+            const depts = {};
+            
+            (window.USERS || []).forEach(u => {
+                if (!depts[u.dept]) depts[u.dept] = [];
+                depts[u.dept].push(u);
+            });
+            
+            container.innerHTML = Object.entries(depts).map(([dept, users]) => `
+                <div class="dept-card">
+                    <div class="dept-header">
+                        <span class="dept-name">${dept}</span>
+                        <span class="dept-count">${users.length}人</span>
+                    </div>
+                    <div class="staff-grid">
+                        ${users.map(u => `
+                            <div class="staff-item">
+                                ${currentUser.dept === '管理部' ? `
+                                <div class="actions">
+                                    <button class="staff-action-btn edit" onclick="showEditStaffModal(${u.id})">✏️</button>
+                                    <button class="staff-action-btn delete" onclick="deleteStaff(${u.id})">🗑️</button>
+                                </div>
+                                ` : ''}
+                                <div class="staff-avatar">${u.name.slice(-2)}</div>
+                                <div class="staff-name">${u.name}</div>
+                                <div class="staff-role">${u.role}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function showAddStaffModal() {
+            document.getElementById('addStaffName').value = '';
+            document.getElementById('addStaffDept').value = '技术部';
+            document.getElementById('addStaffRole').value = '';
+            document.getElementById('addStaffModal').classList.add('active');
+        }
+        
+        function addStaff() {
+            const name = document.getElementById('addStaffName').value.trim();
+            const dept = document.getElementById('addStaffDept').value;
+            const role = document.getElementById('addStaffRole').value.trim();
+            
+            if (!name || !role) {
+                showToast('请填写姓名和职位', 'error');
+                return;
+            }
+            
+            const newStaff = {
+                id: Date.now(),
+                name, dept, role
+            };
+            
+            window.USERS.push(newStaff);
+            window.PASSWORDS[newStaff.id] = '123456';
+            saveData();
+            closeModal('addStaffModal');
+            showToast('人员添加成功', 'success');
+            renderStaff();
+            
+            const select = document.getElementById('userSelect');
+            const opt = document.createElement('option');
+            opt.value = newStaff.id;
+            opt.textContent = `${newStaff.name} (${newStaff.dept})`;
+            select.appendChild(opt);
+        }
+        
+        function showEditStaffModal(id) {
+            const user = window.USERS.find(u => u.id === id);
+            if (!user) return;
+            
+            document.getElementById('editStaffId').value = id;
+            document.getElementById('editStaffName').value = user.name;
+            document.getElementById('editStaffDept').value = user.dept;
+            document.getElementById('editStaffRole').value = user.role;
+            document.getElementById('editStaffModal').classList.add('active');
+        }
+        
+        function saveEditStaff() {
+            const id = parseInt(document.getElementById('editStaffId').value);
+            const user = window.USERS.find(u => u.id === id);
+            if (!user) return;
+            
+            const name = document.getElementById('editStaffName').value.trim();
+            const dept = document.getElementById('editStaffDept').value;
+            const role = document.getElementById('editStaffRole').value.trim();
+            
+            if (!name || !role) {
+                showToast('请填写姓名和职位', 'error');
+                return;
+            }
+            
+            user.name = name;
+            user.dept = dept;
+            user.role = role;
+            
+            saveData();
+            closeModal('editStaffModal');
+            showToast('人员信息已保存', 'success');
+            renderStaff();
+            
+            if (currentUser && currentUser.id === id) {
+                currentUser = user;
+                document.getElementById('currentUser').textContent = currentUser.name;
+                document.getElementById('currentDept').textContent = currentUser.dept + ' · ' + currentUser.role;
+                document.getElementById('profileName').textContent = currentUser.name;
+                document.getElementById('profileDept').textContent = currentUser.dept + ' · ' + currentUser.role;
+                document.getElementById('profileAvatar').textContent = currentUser.name.slice(-2);
+            }
+        }
+        
+        function deleteStaff(id) {
+            const user = window.USERS.find(u => u.id === id);
+            if (!user) return;
+            
+            if (user.id === currentUser.id) {
+                showToast('不能删除自己', 'error');
+                return;
+            }
+            
+            document.getElementById('deleteConfirmText').textContent = `确定要删除 "${user.name}" 吗？`;
+            deleteCallback = () => {
+                const idx = window.USERS.findIndex(u => u.id === id);
+                if (idx !== -1) {
+                    window.USERS.splice(idx, 1);
+                    delete window.PASSWORDS[id];
+                    saveData();
+                    showToast('人员已删除', 'success');
+                    renderStaff();
+                }
+            };
+            document.getElementById('deleteConfirmModal').classList.add('active');
+            document.getElementById('deleteConfirmBtn').onclick = () => {
+                closeModal('deleteConfirmModal');
+                if (deleteCallback) deleteCallback();
+            };
+        }
+        
+        function exportStaff() {
+            const users = window.USERS || [];
+            let csv = '\uFEFF工号,姓名,部门,职位\n';
+            users.forEach(u => {
+                csv += `${u.id},"${u.name}","${u.dept}","${u.role}"\n`;
+            });
+            
+            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `人员表_${new Date().toLocaleDateString()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('人员表已导出', 'success');
+        }
+        
+        function importStaffFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split('\n').filter(l => l.trim());
+                    
+                    if (lines.length < 2) {
+                        showToast('CSV文件内容为空或格式不正确', 'error');
+                        return;
+                    }
+                    
+                    const newUsers = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const cols = parseCSVLine(lines[i]);
+                        if (cols.length >= 4) {
+                            newUsers.push({
+                                id: parseInt(cols[0]) || Date.now() + i,
+                                name: cols[1] || '',
+                                dept: cols[2] || '技术部',
+                                role: cols[3] || ''
+                            });
+                            window.PASSWORDS[parseInt(cols[0]) || Date.now() + i] = '123456';
+                        }
+                    }
+                    
+                    if (newUsers.length > 0) {
+                        window.USERS = [...window.USERS, ...newUsers];
+                        saveData();
+                        showToast(`成功导入 ${newUsers.length} 条人员数据`, 'success');
+                        renderStaff();
+                    } else {
+                        showToast('未找到有效数据', 'error');
+                    }
+                } catch (err) {
+                    showToast('导入失败：' + err.message, 'error');
+                }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+        
+        // ============ 消息中心 ============
+        function getMessages() {
+            const messages = [];
+            const orders = window.ORDERS || [];
+            const inv = window.INVENTORY || [];
+            
+            orders.forEach(o => {
+                if (o.status === 'overdue') {
+                    messages.push({
+                        type: 'warning',
+                        title: '订单逾期',
+                        content: `${o.id} 已逾期，交货日期：${o.delivery}`
+                    });
+                }
+            });
+            
+            inv.forEach(i => {
+                if (i.qty === 0) {
+                    messages.push({
+                        type: 'danger',
+                        title: '库存缺货',
+                        content: `${i.name} 库存为 0，请及时补货`
+                    });
+                } else if (i.qty < i.min) {
+                    messages.push({
+                        type: 'warning',
+                        title: '库存预警',
+                        content: `${i.name} 库存偏低（${i.qty}），低于安全库存（${i.min}）`
+                    });
+                }
+            });
+            
+            return messages;
+        }
+        
+        function renderMessages() {
+            const messages = getMessages();
+            const container = document.getElementById('messagesList');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>暂无新消息</p></div>';
+            } else {
+                container.innerHTML = messages.map(m => `
+                    <div class="inv-card" style="border-left:4px solid ${m.type === 'danger' ? 'var(--danger)' : 'var(--warning)'};">
+                        <div style="font-weight:600;margin-bottom:5px;">${m.title}</div>
+                        <div style="font-size:13px;color:var(--gray);">${m.content}</div>
+                    </div>
+                `).join('');
+            }
+            
+            const badge = document.getElementById('msgBadge');
+            if (messages.length > 0) {
+                badge.style.display = 'block';
+                badge.textContent = messages.length;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        // ============ 个人设置 ============
+        function showChangePasswordModal() {
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('changePasswordModal').classList.add('active');
+        }
+        
+        function changePassword() {
+            const oldPwd = document.getElementById('oldPassword').value;
+            const newPwd = document.getElementById('newPassword').value;
+            const confirmPwd = document.getElementById('confirmPassword').value;
+            
+            const storedPass = window.PASSWORDS[currentUser.id] || '123456';
+            if (oldPwd !== storedPass) {
+                showToast('当前密码错误', 'error');
+                return;
+            }
+            
+            if (!newPwd || newPwd.length < 4) {
+                showToast('新密码至少4位', 'error');
+                return;
+            }
+            
+            if (newPwd !== confirmPwd) {
+                showToast('两次密码不一致', 'error');
+                return;
+            }
+            
+            window.PASSWORDS[currentUser.id] = newPwd;
+            saveData();
+            closeModal('changePasswordModal');
+            showToast('密码修改成功', 'success');
+        }
+        
+        function exportAllData() {
+            const data = {
+                users: window.USERS,
+                orders: window.ORDERS,
+                bom: window.BOM,
+                inventory: window.INVENTORY,
+                invLogs: window.INV_LOGS,
+                passwords: window.PASSWORDS,
+                exportTime: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `巴法洛数据备份_${new Date().toLocaleDateString()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('数据已导出', 'success');
+        }
+        
+        function importAllData() {
+            document.getElementById('importAllFile').click();
+        }
+        
+        function doImportAllData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.users) window.USERS = data.users;
+                    if (data.orders) window.ORDERS = data.orders;
+                    if (data.bom) window.BOM = data.bom;
+                    if (data.inventory) window.INVENTORY = data.inventory;
+                    if (data.invLogs) window.INV_LOGS = data.invLogs;
+                    if (data.passwords) window.PASSWORDS = data.passwords;
+                    
+                    saveData();
+                    showToast('数据导入成功', 'success');
+                    location.reload();
+                } catch (err) {
+                    showToast('导入失败：' + err.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+        
+        function showResetConfirm() {
+            document.getElementById('deleteConfirmText').textContent = '确定要重置所有数据吗？这将删除所有订单、BOM、库存和人员数据，且无法恢复！';
+            deleteCallback = () => {
+                resetAllData();
+            };
+            document.getElementById('deleteConfirmModal').classList.add('active');
+            document.getElementById('deleteConfirmBtn').onclick = () => {
+                closeModal('deleteConfirmModal');
+                if (deleteCallback) deleteCallback();
+            };
+        }
+        
+        // ============ 工具函数 ============
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+        
+        function showToast(msg, type) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + (type || '');
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // ============ 启动 ============
+        init();
+    </script>
+</body>
+</html>
