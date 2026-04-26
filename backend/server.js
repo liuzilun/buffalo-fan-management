@@ -5,13 +5,68 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const hpp = require('hpp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'buffalo-fan-secret-key-2024';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.warn('[SECURITY] 警告：未设置环境变量 JWT_SECRET，正在使用随机生成的临时密钥。生产环境请务必设置强密钥！');
+}
+const SECRET = JWT_SECRET || require('crypto').randomBytes(32).toString('hex');
 
-app.use(cors());
-app.use(express.json());
+// ============ 安全中间件 ============
+app.disable('x-powered-by');
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+app.use(hpp());
+
+// CORS 白名单
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error('CORS策略阻止了该来源的请求'));
+  },
+  credentials: true
+}));
+
+// 请求限制
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// 全局API速率限制
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  message: { error: '请求过于频繁，请稍后再试' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', apiLimiter);
+
+// 登录接口更严格的速率限制
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: '登录尝试次数过多，请15分钟后再试' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/auth/login', loginLimiter);
 
 // ============ 数据库 ============
 const dbPath = path.join(__dirname, 'buffalo.db');
@@ -78,6 +133,17 @@ db.serialize(() => {
     item_name TEXT,
     qty INTEGER,
     remark TEXT,
+    time INTEGER
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    user_name TEXT,
+    action TEXT,
+    target TEXT,
+    detail TEXT,
+    ip TEXT,
     time INTEGER
   )`);
 });
@@ -166,12 +232,25 @@ function initDemoData() {
 
 initDemoData();
 
+// ============ 工具函数 ============
+function sanitize(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/[<>]/g, '').trim().slice(0, 500);
+}
+
+function auditLog(req, action, target, detail) {
+  const user = req.user || {};
+  const ip = req.ip || (req.socket && req.socket.remoteAddress) || (req.connection && req.connection.remoteAddress) || '';
+  db.run("INSERT INTO audit_logs (user_id, user_name, action, target, detail, ip, time) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [user.id || null, user.name || '', action, target, detail, ip, Date.now()]);
+}
+
 // ============ 认证中间件 ============
 function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ error: '未提供令牌' });
-  jwt.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: '令牌无效' });
     req.user = user;
     next();
@@ -182,12 +261,20 @@ function authMiddleware(req, res, next) {
 app.post('/api/auth/login', (req, res) => {
   const { userId, password } = req.body;
   if (!userId || !password) return res.status(400).json({ error: '缺少参数' });
+  if (typeof password !== 'string' || password.length > 100) return res.status(400).json({ error: '参数异常' });
 
   db.get("SELECT * FROM users WHERE id = ?", [userId], (err, user) => {
-    if (err || !user) return res.status(401).json({ error: '用户不存在' });
+    if (err || !user) {
+      auditLog({ user: { id: userId, name: '未知' } }, '登录失败', 'auth', '用户不存在或ID=' + userId);
+      return res.status(401).json({ error: '用户不存在' });
+    }
     bcrypt.compare(password, user.password, (err, match) => {
-      if (err || !match) return res.status(401).json({ error: '密码错误' });
-      const token = jwt.sign({ id: user.id, name: user.name, dept: user.dept, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+      if (err || !match) {
+        auditLog({ user: { id: user.id, name: user.name } }, '登录失败', 'auth', '密码错误');
+        return res.status(401).json({ error: '密码错误' });
+      }
+      const token = jwt.sign({ id: user.id, name: user.name, dept: user.dept, role: user.role }, SECRET, { expiresIn: '7d' });
+      auditLog({ user: { id: user.id, name: user.name } }, '登录成功', 'auth', '');
       res.json({ token, user: { id: user.id, name: user.name, dept: user.dept, role: user.role } });
     });
   });
@@ -207,18 +294,28 @@ app.get('/api/users', authMiddleware, (req, res) => {
 
 app.post('/api/users', authMiddleware, (req, res) => {
   const { id, name, dept, role, password } = req.body;
-  const pwd = password || '123456';
+  if (!name || !dept || !role) return res.status(400).json({ error: '缺少必填字段' });
+  const safeName = sanitize(name);
+  const safeDept = sanitize(dept);
+  const safeRole = sanitize(role);
+  const pwd = (typeof password === 'string' && password) ? password : '123456';
   const hash = bcrypt.hashSync(pwd, 10);
-  db.run("INSERT INTO users (id, name, dept, role, password) VALUES (?, ?, ?, ?, ?)", [id || Date.now(), name, dept, role, hash], function(err) {
+  db.run("INSERT INTO users (id, name, dept, role, password) VALUES (?, ?, ?, ?, ?)", [id || Date.now(), safeName, safeDept, safeRole, hash], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '添加人员', 'user', safeName);
     res.json({ id: this.lastID || id });
   });
 });
 
 app.put('/api/users/:id', authMiddleware, (req, res) => {
   const { name, dept, role } = req.body;
-  db.run("UPDATE users SET name = ?, dept = ?, role = ? WHERE id = ?", [name, dept, role, req.params.id], function(err) {
+  if (!name || !dept || !role) return res.status(400).json({ error: '缺少必填字段' });
+  const safeName = sanitize(name);
+  const safeDept = sanitize(dept);
+  const safeRole = sanitize(role);
+  db.run("UPDATE users SET name = ?, dept = ?, role = ? WHERE id = ?", [safeName, safeDept, safeRole, req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '修改人员', 'user', 'ID=' + req.params.id);
     res.json({ updated: this.changes });
   });
 });
@@ -226,6 +323,7 @@ app.put('/api/users/:id', authMiddleware, (req, res) => {
 app.delete('/api/users/:id', authMiddleware, (req, res) => {
   db.run("DELETE FROM users WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '删除人员', 'user', 'ID=' + req.params.id);
     res.json({ deleted: this.changes });
   });
 });
@@ -244,24 +342,32 @@ app.get('/api/orders', authMiddleware, (req, res) => {
 
 app.post('/api/orders', authMiddleware, (req, res) => {
   const { id, customer, model, qty, delivery, status, processes, qc, created } = req.body;
+  if (!id || !customer || !model) return res.status(400).json({ error: '缺少必填字段' });
+  const safeId = sanitize(id);
+  const safeCustomer = sanitize(customer);
+  const safeModel = sanitize(model);
   const procs = JSON.stringify(processes || Array(8).fill(false));
   const qcs = JSON.stringify(qc || Array(6).fill(false));
   db.run("INSERT INTO orders (id, customer, model, qty, delivery, status, processes, qc, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [id, customer, model, qty || 1, delivery, status || 'pending', procs, qcs, created || new Date().toISOString()],
+    [safeId, safeCustomer, safeModel, qty || 1, delivery, status || 'pending', procs, qcs, created || new Date().toISOString()],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ id });
+      auditLog(req, '创建订单', 'order', safeId);
+      res.json({ id: safeId });
     });
 });
 
 app.put('/api/orders/:id', authMiddleware, (req, res) => {
   const { customer, model, qty, delivery, status, processes, qc } = req.body;
+  const safeCustomer = customer ? sanitize(customer) : undefined;
+  const safeModel = model ? sanitize(model) : undefined;
   const procs = processes ? JSON.stringify(processes) : undefined;
   const qcs = qc ? JSON.stringify(qc) : undefined;
-  db.run("UPDATE orders SET customer = ?, model = ?, qty = ?, delivery = ?, status = ?, processes = COALESCE(?, processes), qc = COALESCE(?, qc) WHERE id = ?",
-    [customer, model, qty, delivery, status, procs, qcs, req.params.id],
+  db.run("UPDATE orders SET customer = COALESCE(?, customer), model = COALESCE(?, model), qty = COALESCE(?, qty), delivery = COALESCE(?, delivery), status = COALESCE(?, status), processes = COALESCE(?, processes), qc = COALESCE(?, qc) WHERE id = ?",
+    [safeCustomer, safeModel, qty, delivery, status, procs, qcs, req.params.id],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '修改订单', 'order', 'ID=' + req.params.id);
       res.json({ updated: this.changes });
     });
 });
@@ -269,6 +375,7 @@ app.put('/api/orders/:id', authMiddleware, (req, res) => {
 app.delete('/api/orders/:id', authMiddleware, (req, res) => {
   db.run("DELETE FROM orders WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '删除订单', 'order', 'ID=' + req.params.id);
     res.json({ deleted: this.changes });
   });
 });
@@ -286,21 +393,26 @@ app.get('/api/bom', authMiddleware, (req, res) => {
 
 app.post('/api/bom', authMiddleware, (req, res) => {
   const { id, code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, changes } = req.body;
+  if (!id || !name) return res.status(400).json({ error: '缺少必填字段' });
+  const safeName = sanitize(name);
   db.run("INSERT INTO bom (id, code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, changes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [id, code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status || 'enough', JSON.stringify(changes || ['','','',''])],
+    [id, code, model, safeName, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status || 'enough', JSON.stringify(changes || ['','','',''])],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '添加BOM', 'bom', id);
       res.json({ id });
     });
 });
 
 app.put('/api/bom/:id', authMiddleware, (req, res) => {
   const { code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, changes } = req.body;
+  const safeName = name ? sanitize(name) : undefined;
   const chg = changes ? JSON.stringify(changes) : undefined;
-  db.run("UPDATE bom SET code = ?, model = ?, name = ?, qty = ?, material = ?, unitWeight = ?, totalWeight = ?, unit = ?, manufacturer = ?, remark = ?, status = ?, changes = COALESCE(?, changes) WHERE id = ?",
-    [code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, chg, req.params.id],
+  db.run("UPDATE bom SET code = COALESCE(?, code), model = COALESCE(?, model), name = COALESCE(?, name), qty = COALESCE(?, qty), material = COALESCE(?, material), unitWeight = COALESCE(?, unitWeight), totalWeight = COALESCE(?, totalWeight), unit = COALESCE(?, unit), manufacturer = COALESCE(?, manufacturer), remark = COALESCE(?, remark), status = COALESCE(?, status), changes = COALESCE(?, changes) WHERE id = ?",
+    [code, model, safeName, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, chg, req.params.id],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '修改BOM', 'bom', 'ID=' + req.params.id);
       res.json({ updated: this.changes });
     });
 });
@@ -308,6 +420,7 @@ app.put('/api/bom/:id', authMiddleware, (req, res) => {
 app.delete('/api/bom/:id', authMiddleware, (req, res) => {
   db.run("DELETE FROM bom WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '删除BOM', 'bom', 'ID=' + req.params.id);
     res.json({ deleted: this.changes });
   });
 });
@@ -325,21 +438,26 @@ app.get('/api/inventory', authMiddleware, (req, res) => {
 
 app.post('/api/inventory', authMiddleware, (req, res) => {
   const { id, name, spec, category, material, qty, min, max, unit, price, location, remark, status, changes } = req.body;
+  if (!id || !name) return res.status(400).json({ error: '缺少必填字段' });
+  const safeName = sanitize(name);
   db.run("INSERT INTO inventory (id, name, spec, category, material, qty, min, max, unit, price, location, remark, status, changes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [id, name, spec, category, material, qty, min, max, unit, price, location, remark, status || 'enough', JSON.stringify(changes || ['','','',''])],
+    [id, safeName, spec, category, material, qty, min, max, unit, price, location, remark, status || 'enough', JSON.stringify(changes || ['','','',''])],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '添加库存', 'inventory', id);
       res.json({ id });
     });
 });
 
 app.put('/api/inventory/:id', authMiddleware, (req, res) => {
   const { name, spec, category, material, qty, min, max, unit, price, location, remark, status, changes } = req.body;
+  const safeName = name ? sanitize(name) : undefined;
   const chg = changes ? JSON.stringify(changes) : undefined;
-  db.run("UPDATE inventory SET name = ?, spec = ?, category = ?, material = ?, qty = ?, min = ?, max = ?, unit = ?, price = ?, location = ?, remark = ?, status = ?, changes = COALESCE(?, changes) WHERE id = ?",
-    [name, spec, category, material, qty, min, max, unit, price, location, remark, status, chg, req.params.id],
+  db.run("UPDATE inventory SET name = COALESCE(?, name), spec = COALESCE(?, spec), category = COALESCE(?, category), material = COALESCE(?, material), qty = COALESCE(?, qty), min = COALESCE(?, min), max = COALESCE(?, max), unit = COALESCE(?, unit), price = COALESCE(?, price), location = COALESCE(?, location), remark = COALESCE(?, remark), status = COALESCE(?, status), changes = COALESCE(?, changes) WHERE id = ?",
+    [safeName, spec, category, material, qty, min, max, unit, price, location, remark, status, chg, req.params.id],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '修改库存', 'inventory', 'ID=' + req.params.id);
       res.json({ updated: this.changes });
     });
 });
@@ -347,6 +465,7 @@ app.put('/api/inventory/:id', authMiddleware, (req, res) => {
 app.delete('/api/inventory/:id', authMiddleware, (req, res) => {
   db.run("DELETE FROM inventory WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '删除库存', 'inventory', 'ID=' + req.params.id);
     res.json({ deleted: this.changes });
   });
 });
@@ -360,6 +479,7 @@ app.get('/api/inventory/logs', authMiddleware, (req, res) => {
 
 app.post('/api/inventory/in', authMiddleware, (req, res) => {
   const { itemId, qty, remark } = req.body;
+  if (!itemId || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: '参数错误' });
   db.get("SELECT * FROM inventory WHERE id = ?", [itemId], (err, item) => {
     if (err || !item) return res.status(404).json({ error: '物料不存在' });
     const newQty = item.qty + qty;
@@ -367,6 +487,7 @@ app.post('/api/inventory/in', authMiddleware, (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       db.run("INSERT INTO inv_logs (item_id, type, item_name, qty, remark, time) VALUES (?, ?, ?, ?, ?, ?)",
         [itemId, 'in', item.name, qty, remark || '入库', Date.now()]);
+      auditLog(req, '入库', 'inventory', `${item.name} +${qty}`);
       res.json({ success: true, qty: newQty });
     });
   });
@@ -374,6 +495,7 @@ app.post('/api/inventory/in', authMiddleware, (req, res) => {
 
 app.post('/api/inventory/out', authMiddleware, (req, res) => {
   const { itemId, qty, remark } = req.body;
+  if (!itemId || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: '参数错误' });
   db.get("SELECT * FROM inventory WHERE id = ?", [itemId], (err, item) => {
     if (err || !item) return res.status(404).json({ error: '物料不存在' });
     if (item.qty < qty) return res.status(400).json({ error: '库存不足' });
@@ -382,8 +504,17 @@ app.post('/api/inventory/out', authMiddleware, (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       db.run("INSERT INTO inv_logs (item_id, type, item_name, qty, remark, time) VALUES (?, ?, ?, ?, ?, ?)",
         [itemId, 'out', item.name, qty, remark || '出库', Date.now()]);
+      auditLog(req, '出库', 'inventory', `${item.name} -${qty}`);
       res.json({ success: true, qty: newQty });
     });
+  });
+});
+
+app.get('/api/audit-logs', authMiddleware, (req, res) => {
+  if (req.user.dept !== '管理部') return res.status(403).json({ error: '无权访问' });
+  db.all("SELECT * FROM audit_logs ORDER BY time DESC LIMIT 500", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
   });
 });
 
