@@ -1231,6 +1231,14 @@
                 <label>交货日期</label>
                 <input type="date" id="addOrderDelivery">
             </div>
+            <div class="form-group">
+                <label>优先级</label>
+                <select id="addOrderPriority" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
+                    <option value="urgent">🔴 紧急</option>
+                    <option value="normal" selected>🟡 普通</option>
+                    <option value="low">🟢 低</option>
+                </select>
+            </div>
             <div class="modal-btns">
                 <button class="btn btn-secondary" onclick="closeModal('addOrderModal')">取消</button>
                 <button class="btn btn-primary" onclick="addOrder()">创建</button>
@@ -1274,6 +1282,14 @@
                     <option value="production">生产中</option>
                     <option value="qc">质检中</option>
                     <option value="completed">已完成</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>优先级</label>
+                <select id="editOrderPriority" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
+                    <option value="urgent">🔴 紧急</option>
+                    <option value="normal">🟡 普通</option>
+                    <option value="low">🟢 低</option>
                 </select>
             </div>
             <div class="modal-btns">
@@ -2211,12 +2227,14 @@
             const statusText = {pending:'待生产',production:'生产中',qc:'质检中',completed:'已完成',overdue:'已逾期'};
             const statusClass = order.status;
             const warn = getDeliveryWarning(order.delivery, order.status);
+            const priorityMap = {urgent:{text:'紧急',bg:'#fee2e2',color:'#dc2626'},normal:{text:'普通',bg:'#fef3c7',color:'#d97706'},low:{text:'低',bg:'#dcfce7',color:'#16a34a'}};
+            const pri = priorityMap[order.priority] || priorityMap.normal;
             
             return `
                 <div class="order-card status-${statusClass}" onclick="showOrderDetail('${order.id}')">
                     <div class="order-header">
                         <div>
-                            <div class="order-id">${order.id}</div>
+                            <div class="order-id">${order.id} <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;background:${pri.bg};color:${pri.color};font-weight:600;margin-left:4px;">${pri.text}</span></div>
                             <div class="order-name">${order.customer} · ${order.model}</div>
                         </div>
                         <span class="order-badge badge-${statusClass}">${statusText[order.status]}</span>
@@ -2466,6 +2484,7 @@
             populateSelect('addOrderModel', window.MODELS || [], 'name', 'name', '请选择风机型号');
             document.getElementById('addOrderQty').value = '1';
             document.getElementById('addOrderDelivery').value = '';
+            document.getElementById('addOrderPriority').value = 'normal';
             document.getElementById('addOrderModal').classList.add('active');
         }
         
@@ -2475,6 +2494,7 @@
             const model = document.getElementById('addOrderModel').value.trim();
             const qty = parseInt(document.getElementById('addOrderQty').value) || 1;
             const delivery = document.getElementById('addOrderDelivery').value;
+            const priority = document.getElementById('addOrderPriority').value;
 
             if (!id || !customer || !model) {
                 showToast('请填写必填字段', 'error');
@@ -2487,7 +2507,7 @@
             }
 
             const newOrder = {
-                id, customer, model, qty, delivery,
+                id, customer, model, qty, delivery, priority,
                 status: 'pending',
                 processes: Array(8).fill(null).map(() => ({ done: false, operator: '', time: '', remark: '', abnormal: '' })),
                 qc: Array(6).fill(false),
@@ -2516,6 +2536,7 @@
             document.getElementById('editOrderQty').value = order.qty;
             document.getElementById('editOrderDelivery').value = order.delivery;
             document.getElementById('editOrderStatus').value = order.status;
+            document.getElementById('editOrderPriority').value = order.priority || 'normal';
             document.getElementById('editOrderModal').classList.add('active');
         }
         
@@ -2547,6 +2568,7 @@
                 qty: parseInt(document.getElementById('editOrderQty').value) || 1,
                 delivery: document.getElementById('editOrderDelivery').value,
                 status: newStatus,
+                priority: document.getElementById('editOrderPriority').value,
                 processes: order.processes,
                 qc: order.qc
             };
@@ -3330,55 +3352,26 @@
         }
         
         // ============ 消息中心 ============
-        function getMessages() {
-            const messages = [];
-            const orders = window.ORDERS || [];
-            const inv = window.INVENTORY || [];
-            
-            orders.forEach(o => {
-                if (o.status === 'overdue') {
-                    messages.push({
-                        type: 'warning',
-                        title: '订单逾期',
-                        content: `${o.id} 已逾期，交货日期：${o.delivery}`
-                    });
-                }
-            });
-            
-            inv.forEach(i => {
-                if (i.qty === 0) {
-                    messages.push({
-                        type: 'danger',
-                        title: '库存缺货',
-                        content: `${i.name} 库存为 0，请及时补货`
-                    });
-                } else if (i.qty < i.min) {
-                    messages.push({
-                        type: 'warning',
-                        title: '库存预警',
-                        content: `${i.name} 库存偏低（${i.qty}），低于安全库存（${i.min}）`
-                    });
-                }
-            });
-            
-            return messages;
+        async function getMessages() {
+            const alerts = await apiRequest('/alerts');
+            return alerts || [];
         }
-        
-        function renderMessages() {
-            const messages = getMessages();
+                
+        async function renderMessages() {
+            const messages = await getMessages();
             const container = document.getElementById('messagesList');
-            
+                    
             if (messages.length === 0) {
                 container.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>暂无新消息</p></div>';
             } else {
                 container.innerHTML = messages.map(m => `
                     <div class="inv-card" style="border-left:4px solid ${m.type === 'danger' ? 'var(--danger)' : 'var(--warning)'};">
-                        <div style="font-weight:600;margin-bottom:5px;">${m.title}</div>
-                        <div style="font-size:13px;color:var(--gray);">${m.content}</div>
+                        <div style="font-weight:600;margin-bottom:5px;">${m.type === 'danger' ? '⚠️' : '🔔'} ${m.target === 'inventory' ? '库存预警' : '交期预警'}</div>
+                        <div style="font-size:13px;color:var(--gray);">${m.msg}</div>
                     </div>
                 `).join('');
             }
-            
+                    
             const badge = document.getElementById('msgBadge');
             if (messages.length > 0) {
                 badge.style.display = 'block';

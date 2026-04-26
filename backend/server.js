@@ -104,10 +104,16 @@ db.serialize(() => {
     qty INTEGER DEFAULT 1,
     delivery TEXT,
     status TEXT DEFAULT 'pending',
+    priority TEXT DEFAULT 'normal',
     processes TEXT,
     qc TEXT,
     created TEXT
   )`);
+
+  // 兼容旧数据：为没有priority字段的订单表添加该列
+  db.run(`ALTER TABLE orders ADD COLUMN priority TEXT DEFAULT 'normal'`, (err) => {
+    if (err && !err.message.includes('duplicate column')) console.log('[DB] orders.priority 列已存在或无需添加');
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS bom (
     id TEXT PRIMARY KEY,
@@ -538,7 +544,7 @@ app.get('/api/orders', authMiddleware, checkPermission('order:view'), (req, res)
 });
 
 app.post('/api/orders', authMiddleware, checkPermission('order:create'), (req, res) => {
-  const { id, customer, model, qty, delivery, status, processes, qc, created } = req.body;
+  const { id, customer, model, qty, delivery, status, priority, processes, qc, created } = req.body;
   if (!id || !customer || !model) return res.status(400).json({ error: '缺少必填字段' });
   const safeId = sanitize(id);
   const safeCustomer = sanitize(customer);
@@ -546,8 +552,8 @@ app.post('/api/orders', authMiddleware, checkPermission('order:create'), (req, r
   const defaultProcs = Array(8).fill(null).map(() => ({ done: false, operator: '', time: '', remark: '', abnormal: '' }));
   const procs = JSON.stringify(processes || defaultProcs);
   const qcs = JSON.stringify(qc || Array(6).fill(false));
-  db.run("INSERT INTO orders (id, customer, model, qty, delivery, status, processes, qc, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [safeId, safeCustomer, safeModel, qty || 1, delivery, status || 'pending', procs, qcs, created || new Date().toISOString()],
+  db.run("INSERT INTO orders (id, customer, model, qty, delivery, status, priority, processes, qc, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [safeId, safeCustomer, safeModel, qty || 1, delivery, status || 'pending', priority || 'normal', procs, qcs, created || new Date().toISOString()],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       auditLog(req, '创建订单', 'order', safeId);
@@ -571,8 +577,8 @@ app.put('/api/orders/:id', authMiddleware, checkPermission('order:edit'), (req, 
     });
   }
 
-  db.run("UPDATE orders SET customer = COALESCE(?, customer), model = COALESCE(?, model), qty = COALESCE(?, qty), delivery = COALESCE(?, delivery), status = COALESCE(?, status), processes = COALESCE(?, processes), qc = COALESCE(?, qc) WHERE id = ?",
-    [safeCustomer, safeModel, qty, delivery, status, procs, qcs, req.params.id],
+  db.run("UPDATE orders SET customer = COALESCE(?, customer), model = COALESCE(?, model), qty = COALESCE(?, qty), delivery = COALESCE(?, delivery), status = COALESCE(?, status), priority = COALESCE(?, priority), processes = COALESCE(?, processes), qc = COALESCE(?, qc) WHERE id = ?",
+    [safeCustomer, safeModel, qty, delivery, status, req.body.priority, procs, qcs, req.params.id],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       auditLog(req, '修改订单', 'order', 'ID=' + req.params.id);
@@ -1209,6 +1215,38 @@ app.post('/api/import/:type', authMiddleware, (req, res) => {
   } else {
     res.status(400).json({ error: '不支持的导入类型' });
   }
+});
+
+// ============ 库存预警 & 消息 API ============
+app.get('/api/alerts', authMiddleware, (req, res) => {
+  db.all("SELECT id, name, qty, min, status FROM inventory", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const alerts = [];
+    rows.forEach(item => {
+      if (item.qty === 0) {
+        alerts.push({ type: 'danger', target: 'inventory', id: item.id, name: item.name, msg: `物料 ${item.name}(${item.id}) 已缺货` });
+      } else if (item.qty < item.min) {
+        alerts.push({ type: 'warning', target: 'inventory', id: item.id, name: item.name, msg: `物料 ${item.name}(${item.id}) 库存低于安全线，当前${item.qty}，安全${item.min}` });
+      }
+    });
+    // 逾期订单预警
+    db.all("SELECT id, customer, model, delivery FROM orders WHERE status != 'completed' AND delivery < date('now')", [], (err, overdueOrders) => {
+      if (!err && overdueOrders) {
+        overdueOrders.forEach(o => {
+          alerts.push({ type: 'danger', target: 'order', id: o.id, name: o.id, msg: `订单 ${o.id} 已逾期，客户：${o.customer}` });
+        });
+      }
+      // 3天内交期预警
+      db.all("SELECT id, customer, model, delivery FROM orders WHERE status != 'completed' AND delivery >= date('now') AND delivery <= date('now', '+3 days')", [], (err, nearOrders) => {
+        if (!err && nearOrders) {
+          nearOrders.forEach(o => {
+            alerts.push({ type: 'warning', target: 'order', id: o.id, name: o.id, msg: `订单 ${o.id} 交期临近(${o.delivery})，客户：${o.customer}` });
+          });
+        }
+        res.json(alerts);
+      });
+    });
+  });
 });
 
 // ============ 静态文件 & 启动 ============
