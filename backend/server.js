@@ -183,6 +183,23 @@ db.serialize(() => {
     role_id INTEGER,
     PRIMARY KEY (user_id, role_id)
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    contact TEXT,
+    phone TEXT,
+    address TEXT,
+    remark TEXT,
+    created TEXT
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS models (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    remark TEXT,
+    created TEXT
+  )`);
 });
 
 // ============ 初始化演示数据 ============
@@ -265,6 +282,46 @@ function initDemoData() {
     invs.forEach(i => stmt.run(i.id, i.name, i.spec, i.category, i.material, i.qty, i.min, i.max, i.unit, i.price, i.location, i.remark, i.status, i.changes));
     stmt.finalize();
   });
+
+  db.get("SELECT COUNT(*) as count FROM customers", (err, row) => {
+    if (err || row.count > 0) return;
+    const customers = [
+      {name:'玖龙纸业', contact:'张经理', phone:'13800138001', address:'广东东莞', remark:'长期合作'},
+      {name:'山东金锣', contact:'李经理', phone:'13800138002', address:'山东临沂', remark:''},
+      {name:'宁波亚洲', contact:'王经理', phone:'13800138003', address:'浙江宁波', remark:''},
+      {name:'武汉裕大', contact:'赵经理', phone:'13800138004', address:'湖北武汉', remark:''},
+      {name:'苏州恒力', contact:'陈经理', phone:'13800138005', address:'江苏苏州', remark:''},
+      {name:'南通恒科', contact:'刘经理', phone:'13800138006', address:'江苏南通', remark:''},
+      {name:'江西晨鸣', contact:'周经理', phone:'13800138007', address:'江西南昌', remark:''},
+      {name:'天津锦祥', contact:'吴经理', phone:'13800138008', address:'天津', remark:''},
+      {name:'江苏博汇', contact:'郑经理', phone:'13800138009', address:'江苏盐城', remark:''},
+      {name:'重庆理文', contact:'孙经理', phone:'13800138010', address:'重庆', remark:''},
+      {name:'河北华泰', contact:'钱经理', phone:'13800138011', address:'河北石家庄', remark:''},
+      {name:'福建联盛', contact:'冯经理', phone:'13800138012', address:'福建漳州', remark:''}
+    ];
+    const stmt = db.prepare("INSERT INTO customers (name, contact, phone, address, remark, created) VALUES (?, ?, ?, ?, ?, ?)");
+    customers.forEach(c => stmt.run(c.name, c.contact, c.phone, c.address, c.remark, new Date().toISOString()));
+    stmt.finalize();
+  });
+
+  db.get("SELECT COUNT(*) as count FROM models", (err, row) => {
+    if (err || row.count > 0) return;
+    const models = [
+      {name:'BL61-S4900', remark:'大功率离心风机'},
+      {name:'BL60-S3200', remark:'中压离心风机'},
+      {name:'BL61-S3300', remark:'高压离心风机'},
+      {name:'BL50-S2100', remark:'标准轴流风机'},
+      {name:'BL61-S4500', remark:'防腐离心风机'},
+      {name:'BL60-S2800', remark:'防爆离心风机'},
+      {name:'BL50-S1800', remark:'小型轴流风机'},
+      {name:'BL61-S5200', remark:'高温离心风机'},
+      {name:'BL60-S3500', remark:'耐磨离心风机'},
+      {name:'BL50-S2000', remark:'低噪轴流风机'}
+    ];
+    const stmt = db.prepare("INSERT INTO models (name, remark, created) VALUES (?, ?, ?)");
+    models.forEach(m => stmt.run(m.name, m.remark, new Date().toISOString()));
+    stmt.finalize();
+  });
 }
 
 initDemoData();
@@ -290,7 +347,15 @@ function initPermissionsAndRoles() {
     {code:'inventory:delete',name:'删除库存',module:'库存管理'},
     {code:'audit:view',name:'查看审计日志',module:'系统管理'},
     {code:'role:manage',name:'角色权限管理',module:'系统管理'},
-    {code:'report:view',name:'查看统计报表',module:'统计分析'}
+    {code:'report:view',name:'查看统计报表',module:'统计分析'},
+    {code:'customer:view',name:'查看客户',module:'客户管理'},
+    {code:'customer:create',name:'添加客户',module:'客户管理'},
+    {code:'customer:edit',name:'修改客户',module:'客户管理'},
+    {code:'customer:delete',name:'删除客户',module:'客户管理'},
+    {code:'model:view',name:'查看风机型号',module:'型号管理'},
+    {code:'model:create',name:'添加风机型号',module:'型号管理'},
+    {code:'model:edit',name:'修改风机型号',module:'型号管理'},
+    {code:'model:delete',name:'删除风机型号',module:'型号管理'}
   ];
   const permStmt = db.prepare("INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES (?, ?, ?, ?)");
   perms.forEach(p => permStmt.run(p.code, p.name, p.module, p.name));
@@ -672,6 +737,84 @@ app.get('/api/audit-logs', authMiddleware, checkPermission('audit:view'), (req, 
   db.all("SELECT * FROM audit_logs ORDER BY time DESC LIMIT 500", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
+  });
+});
+
+// ============ 客户管理 API ============
+app.get('/api/customers', authMiddleware, checkPermission('customer:view'), (req, res) => {
+  db.all("SELECT * FROM customers ORDER BY name", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/customers', authMiddleware, checkPermission('customer:create'), (req, res) => {
+  const { name, contact, phone, address, remark } = req.body;
+  if (!name) return res.status(400).json({ error: '客户名称必填' });
+  db.run("INSERT INTO customers (name, contact, phone, address, remark, created) VALUES (?, ?, ?, ?, ?, ?)",
+    [sanitize(name), sanitize(contact), sanitize(phone), sanitize(address), sanitize(remark), new Date().toISOString()],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '添加客户', 'customer', sanitize(name));
+      res.json({ id: this.lastID, name, contact, phone, address, remark });
+    });
+});
+
+app.put('/api/customers/:id', authMiddleware, checkPermission('customer:edit'), (req, res) => {
+  const { name, contact, phone, address, remark } = req.body;
+  db.run("UPDATE customers SET name = COALESCE(?, name), contact = COALESCE(?, contact), phone = COALESCE(?, phone), address = COALESCE(?, address), remark = COALESCE(?, remark) WHERE id = ?",
+    [name ? sanitize(name) : null, contact ? sanitize(contact) : null, phone ? sanitize(phone) : null, address ? sanitize(address) : null, remark ? sanitize(remark) : null, req.params.id],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '修改客户', 'customer', 'ID=' + req.params.id);
+      res.json({ updated: this.changes });
+    });
+});
+
+app.delete('/api/customers/:id', authMiddleware, checkPermission('customer:delete'), (req, res) => {
+  db.run("DELETE FROM customers WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '删除客户', 'customer', 'ID=' + req.params.id);
+    res.json({ deleted: this.changes });
+  });
+});
+
+// ============ 风机型号管理 API ============
+app.get('/api/models', authMiddleware, checkPermission('model:view'), (req, res) => {
+  db.all("SELECT * FROM models ORDER BY name", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/models', authMiddleware, checkPermission('model:create'), (req, res) => {
+  const { name, remark } = req.body;
+  if (!name) return res.status(400).json({ error: '型号名称必填' });
+  db.run("INSERT INTO models (name, remark, created) VALUES (?, ?, ?)",
+    [sanitize(name), sanitize(remark), new Date().toISOString()],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '添加风机型号', 'model', sanitize(name));
+      res.json({ id: this.lastID, name, remark });
+    });
+});
+
+app.put('/api/models/:id', authMiddleware, checkPermission('model:edit'), (req, res) => {
+  const { name, remark } = req.body;
+  db.run("UPDATE models SET name = COALESCE(?, name), remark = COALESCE(?, remark) WHERE id = ?",
+    [name ? sanitize(name) : null, remark ? sanitize(remark) : null, req.params.id],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      auditLog(req, '修改风机型号', 'model', 'ID=' + req.params.id);
+      res.json({ updated: this.changes });
+    });
+});
+
+app.delete('/api/models/:id', authMiddleware, checkPermission('model:delete'), (req, res) => {
+  db.run("DELETE FROM models WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '删除风机型号', 'model', 'ID=' + req.params.id);
+    res.json({ deleted: this.changes });
   });
 });
 

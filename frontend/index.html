@@ -1082,6 +1082,24 @@
                         <div style="text-align:center;color:var(--gray);padding:40px;">加载中...</div>
                     </div>
                 </div>
+
+                <!-- 客户管理 -->
+                <div class="page" id="page-customers">
+                    <div class="section-title">🏢 客户管理</div>
+                    <div style="padding:10px;">
+                        <button class="btn btn-primary" style="margin-bottom:10px;width:100%;" onclick="openAddCustomerModal()">+ 添加客户</button>
+                        <div id="customersList" style="display:flex;flex-direction:column;gap:10px;"></div>
+                    </div>
+                </div>
+
+                <!-- 风机型号管理 -->
+                <div class="page" id="page-models">
+                    <div class="section-title">🔧 风机型号管理</div>
+                    <div style="padding:10px;">
+                        <button class="btn btn-primary" style="margin-bottom:10px;width:100%;" onclick="openAddModelModal()">+ 添加风机型号</button>
+                        <div id="modelsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+                    </div>
+                </div>
                 
                 <!-- 我的 -->
                 <div class="page" id="page-profile">
@@ -1099,6 +1117,16 @@
                         <div class="menu-item" onclick="showReportPage()" id="reportMenuItem" style="display:none;">
                             <span class="menu-icon">📊</span>
                             <span class="menu-text">统计报表</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="showCustomersPage()">
+                            <span class="menu-icon">🏢</span>
+                            <span class="menu-text">客户管理</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="showModelsPage()">
+                            <span class="menu-icon">🔧</span>
+                            <span class="menu-text">风机型号管理</span>
                             <span class="menu-arrow">›</span>
                         </div>
                         <div class="menu-item" onclick="showChangePasswordModal()">
@@ -1172,11 +1200,15 @@
             </div>
             <div class="form-group">
                 <label>客户名称 *</label>
-                <input type="text" id="addOrderCustomer" placeholder="客户公司名称">
+                <select id="addOrderCustomer" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
+                    <option value="">-- 请选择客户 --</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>风机型号 *</label>
-                <input type="text" id="addOrderModel" placeholder="如: BL61-S4900">
+                <select id="addOrderModel" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
+                    <option value="">-- 请选择风机型号 --</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>订单数量</label>
@@ -1204,11 +1236,15 @@
             </div>
             <div class="form-group">
                 <label>客户名称 *</label>
-                <input type="text" id="editOrderCustomer">
+                <select id="editOrderCustomer" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
+                    <option value="">-- 请选择客户 --</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>风机型号 *</label>
-                <input type="text" id="editOrderModel">
+                <select id="editOrderModel" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);">
+                    <option value="">-- 请选择风机型号 --</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>订单数量</label>
@@ -1394,6 +1430,108 @@
             </div>
         </div>
     </div>
+
+    <!-- 添加客户 -->
+    <div class="modal-overlay" id="addCustomerModal">
+        <div class="modal">
+            <h3>➕ 添加客户</h3>
+            <div class="form-group">
+                <label>客户名称 *</label>
+                <input type="text" id="addCustomerName" placeholder="客户公司名称">
+            </div>
+            <div class="form-group">
+                <label>联系人</label>
+                <input type="text" id="addCustomerContact" placeholder="联系人姓名">
+            </div>
+            <div class="form-group">
+                <label>联系电话</label>
+                <input type="text" id="addCustomerPhone" placeholder="联系电话">
+            </div>
+            <div class="form-group">
+                <label>地址</label>
+                <input type="text" id="addCustomerAddress" placeholder="客户地址">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="addCustomerRemark" placeholder="备注">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('addCustomerModal')">取消</button>
+                <button class="btn btn-primary" onclick="addCustomer()">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑客户 -->
+    <div class="modal-overlay" id="editCustomerModal">
+        <div class="modal">
+            <h3>✏️ 编辑客户</h3>
+            <input type="hidden" id="editCustomerId">
+            <div class="form-group">
+                <label>客户名称 *</label>
+                <input type="text" id="editCustomerName">
+            </div>
+            <div class="form-group">
+                <label>联系人</label>
+                <input type="text" id="editCustomerContact">
+            </div>
+            <div class="form-group">
+                <label>联系电话</label>
+                <input type="text" id="editCustomerPhone">
+            </div>
+            <div class="form-group">
+                <label>地址</label>
+                <input type="text" id="editCustomerAddress">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="editCustomerRemark">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('editCustomerModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEditCustomer()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加风机型号 -->
+    <div class="modal-overlay" id="addModelModal">
+        <div class="modal">
+            <h3>➕ 添加风机型号</h3>
+            <div class="form-group">
+                <label>型号名称 *</label>
+                <input type="text" id="addModelName" placeholder="如: BL61-S4900">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="addModelRemark" placeholder="备注说明">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('addModelModal')">取消</button>
+                <button class="btn btn-primary" onclick="addModel()">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑风机型号 -->
+    <div class="modal-overlay" id="editModelModal">
+        <div class="modal">
+            <h3>✏️ 编辑风机型号</h3>
+            <input type="hidden" id="editModelId">
+            <div class="form-group">
+                <label>型号名称 *</label>
+                <input type="text" id="editModelName">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="editModelRemark">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal('editModelModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEditModel()">保存</button>
+            </div>
+        </div>
+    </div>
     
     <!-- 导入数据 -->
     <input type="file" id="importAllFile" accept=".json" style="display:none;" onchange="doImportAllData(this)">
@@ -1522,18 +1660,22 @@
         
         // ============ 数据持久化（改为后端API） ============
         async function loadData() {
-            const [users, orders, bom, inventory, logs] = await Promise.all([
+            const [users, orders, bom, inventory, logs, customers, models] = await Promise.all([
                 apiRequest('/users'),
                 apiRequest('/orders'),
                 apiRequest('/bom'),
                 apiRequest('/inventory'),
-                apiRequest('/inventory/logs')
+                apiRequest('/inventory/logs'),
+                apiRequest('/customers'),
+                apiRequest('/models')
             ]);
             window.USERS = users || [...USERS_DATA];
             window.ORDERS = orders || [...ORDERS_DATA];
             window.BOM = bom || [...BOM_DATA];
             window.INVENTORY = inventory || [...INVENTORY_DATA];
             window.INV_LOGS = logs || [];
+            window.CUSTOMERS = customers || [];
+            window.MODELS = models || [];
         }
 
         function saveData() {
@@ -1743,6 +1885,175 @@
 
             html += '</div>';
             document.getElementById('reportContent').innerHTML = html;
+        }
+
+        // ============ 客户管理 ============
+        function showCustomersPage() {
+            showTab('customers');
+            renderCustomers();
+        }
+
+        function renderCustomers() {
+            const list = document.getElementById('customersList');
+            const customers = window.CUSTOMERS || [];
+            if (customers.length === 0) {
+                list.innerHTML = '<div style="text-align:center;color:var(--gray);padding:40px;">暂无客户数据</div>';
+                return;
+            }
+            list.innerHTML = customers.map(c => `
+                <div class="order-card" style="padding:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div style="font-weight:600;font-size:15px;">${c.name}</div>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-sm btn-secondary" onclick="openEditCustomerModal(${c.id})">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${c.id}, '${c.name.replace(/'/g, "\\'")}')">删除</button>
+                        </div>
+                    </div>
+                    ${c.contact ? `<div style="font-size:13px;color:var(--gray);margin-top:4px;">联系人: ${c.contact}</div>` : ''}
+                    ${c.phone ? `<div style="font-size:13px;color:var(--gray);">电话: ${c.phone}</div>` : ''}
+                    ${c.address ? `<div style="font-size:13px;color:var(--gray);">地址: ${c.address}</div>` : ''}
+                    ${c.remark ? `<div style="font-size:12px;color:var(--gray);margin-top:4px;">备注: ${c.remark}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function openAddCustomerModal() {
+            document.getElementById('addCustomerName').value = '';
+            document.getElementById('addCustomerContact').value = '';
+            document.getElementById('addCustomerPhone').value = '';
+            document.getElementById('addCustomerAddress').value = '';
+            document.getElementById('addCustomerRemark').value = '';
+            document.getElementById('addCustomerModal').classList.add('active');
+        }
+
+        async function addCustomer() {
+            const name = document.getElementById('addCustomerName').value.trim();
+            const contact = document.getElementById('addCustomerContact').value.trim();
+            const phone = document.getElementById('addCustomerPhone').value.trim();
+            const address = document.getElementById('addCustomerAddress').value.trim();
+            const remark = document.getElementById('addCustomerRemark').value.trim();
+            if (!name) { showToast('客户名称必填', 'error'); return; }
+            const res = await apiRequest('/customers', { method: 'POST', body: JSON.stringify({ name, contact, phone, address, remark }) });
+            if (!res) return;
+            window.CUSTOMERS.push(res);
+            closeModal('addCustomerModal');
+            showToast('客户添加成功', 'success');
+            renderCustomers();
+        }
+
+        function openEditCustomerModal(id) {
+            const c = window.CUSTOMERS.find(x => x.id === id);
+            if (!c) return;
+            document.getElementById('editCustomerId').value = c.id;
+            document.getElementById('editCustomerName').value = c.name;
+            document.getElementById('editCustomerContact').value = c.contact || '';
+            document.getElementById('editCustomerPhone').value = c.phone || '';
+            document.getElementById('editCustomerAddress').value = c.address || '';
+            document.getElementById('editCustomerRemark').value = c.remark || '';
+            document.getElementById('editCustomerModal').classList.add('active');
+        }
+
+        async function saveEditCustomer() {
+            const id = parseInt(document.getElementById('editCustomerId').value);
+            const name = document.getElementById('editCustomerName').value.trim();
+            const contact = document.getElementById('editCustomerContact').value.trim();
+            const phone = document.getElementById('editCustomerPhone').value.trim();
+            const address = document.getElementById('editCustomerAddress').value.trim();
+            const remark = document.getElementById('editCustomerRemark').value.trim();
+            if (!name) { showToast('客户名称必填', 'error'); return; }
+            const res = await apiRequest(`/customers/${id}`, { method: 'PUT', body: JSON.stringify({ name, contact, phone, address, remark }) });
+            if (!res) return;
+            const idx = window.CUSTOMERS.findIndex(x => x.id === id);
+            if (idx >= 0) Object.assign(window.CUSTOMERS[idx], { name, contact, phone, address, remark });
+            closeModal('editCustomerModal');
+            showToast('客户更新成功', 'success');
+            renderCustomers();
+        }
+
+        async function deleteCustomer(id, name) {
+            if (!confirm(`确定删除客户「${name}」吗？`)) return;
+            const res = await apiRequest(`/customers/${id}`, { method: 'DELETE' });
+            if (!res) return;
+            window.CUSTOMERS = window.CUSTOMERS.filter(x => x.id !== id);
+            showToast('客户已删除', 'success');
+            renderCustomers();
+        }
+
+        // ============ 风机型号管理 ============
+        function showModelsPage() {
+            showTab('models');
+            renderModels();
+        }
+
+        function renderModels() {
+            const list = document.getElementById('modelsList');
+            const models = window.MODELS || [];
+            if (models.length === 0) {
+                list.innerHTML = '<div style="text-align:center;color:var(--gray);padding:40px;">暂无型号数据</div>';
+                return;
+            }
+            list.innerHTML = models.map(m => `
+                <div class="order-card" style="padding:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div style="font-weight:600;font-size:15px;">${m.name}</div>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-sm btn-secondary" onclick="openEditModelModal(${m.id})">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteModel(${m.id}, '${m.name.replace(/'/g, "\\'")}')">删除</button>
+                        </div>
+                    </div>
+                    ${m.remark ? `<div style="font-size:13px;color:var(--gray);margin-top:4px;">备注: ${m.remark}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function openAddModelModal() {
+            document.getElementById('addModelName').value = '';
+            document.getElementById('addModelRemark').value = '';
+            document.getElementById('addModelModal').classList.add('active');
+        }
+
+        async function addModel() {
+            const name = document.getElementById('addModelName').value.trim();
+            const remark = document.getElementById('addModelRemark').value.trim();
+            if (!name) { showToast('型号名称必填', 'error'); return; }
+            const res = await apiRequest('/models', { method: 'POST', body: JSON.stringify({ name, remark }) });
+            if (!res) return;
+            window.MODELS.push(res);
+            closeModal('addModelModal');
+            showToast('型号添加成功', 'success');
+            renderModels();
+        }
+
+        function openEditModelModal(id) {
+            const m = window.MODELS.find(x => x.id === id);
+            if (!m) return;
+            document.getElementById('editModelId').value = m.id;
+            document.getElementById('editModelName').value = m.name;
+            document.getElementById('editModelRemark').value = m.remark || '';
+            document.getElementById('editModelModal').classList.add('active');
+        }
+
+        async function saveEditModel() {
+            const id = parseInt(document.getElementById('editModelId').value);
+            const name = document.getElementById('editModelName').value.trim();
+            const remark = document.getElementById('editModelRemark').value.trim();
+            if (!name) { showToast('型号名称必填', 'error'); return; }
+            const res = await apiRequest(`/models/${id}`, { method: 'PUT', body: JSON.stringify({ name, remark }) });
+            if (!res) return;
+            const idx = window.MODELS.findIndex(x => x.id === id);
+            if (idx >= 0) Object.assign(window.MODELS[idx], { name, remark });
+            closeModal('editModelModal');
+            showToast('型号更新成功', 'success');
+            renderModels();
+        }
+
+        async function deleteModel(id, name) {
+            if (!confirm(`确定删除型号「${name}」吗？`)) return;
+            const res = await apiRequest(`/models/${id}`, { method: 'DELETE' });
+            if (!res) return;
+            window.MODELS = window.MODELS.filter(x => x.id !== id);
+            showToast('型号已删除', 'success');
+            renderModels();
         }
 
         // ============ 页面导航 ============
@@ -2044,10 +2355,21 @@
             return `${prefix}N${seq}A`;
         }
 
+        function populateSelect(id, items, valueField, textField, defaultText) {
+            const sel = document.getElementById(id);
+            sel.innerHTML = `<option value="">-- ${defaultText} --</option>`;
+            items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item[valueField];
+                opt.textContent = item[textField];
+                sel.appendChild(opt);
+            });
+        }
+
         function showAddOrderModal() {
             document.getElementById('addOrderId').value = generateOrderId();
-            document.getElementById('addOrderCustomer').value = '';
-            document.getElementById('addOrderModel').value = '';
+            populateSelect('addOrderCustomer', window.CUSTOMERS || [], 'name', 'name', '请选择客户');
+            populateSelect('addOrderModel', window.MODELS || [], 'name', 'name', '请选择风机型号');
             document.getElementById('addOrderQty').value = '1';
             document.getElementById('addOrderDelivery').value = '';
             document.getElementById('addOrderModal').classList.add('active');
@@ -2093,8 +2415,10 @@
             
             document.getElementById('editOrderId').value = orderId;
             document.getElementById('editOrderNum').value = order.id;
-            document.getElementById('editOrderCustomer').value = order.customer;
-            document.getElementById('editOrderModel').value = order.model;
+            populateSelect('editOrderCustomer', window.CUSTOMERS || [], 'name', 'name', '请选择客户');
+            document.getElementById('editOrderCustomer').value = order.customer || '';
+            populateSelect('editOrderModel', window.MODELS || [], 'name', 'name', '请选择风机型号');
+            document.getElementById('editOrderModel').value = order.model || '';
             document.getElementById('editOrderQty').value = order.qty;
             document.getElementById('editOrderDelivery').value = order.delivery;
             document.getElementById('editOrderStatus').value = order.status;
