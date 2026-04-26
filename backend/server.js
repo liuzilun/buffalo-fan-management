@@ -10,6 +10,7 @@ const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 const SERVER_IP = '8.130.185.30';
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -60,7 +61,7 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // 全局API速率限制
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 10000,
   message: { error: '请求过于频繁，请稍后再试' },
   standardHeaders: true,
   legacyHeaders: false
