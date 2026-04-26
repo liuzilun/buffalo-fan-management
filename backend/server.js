@@ -88,8 +88,14 @@ db.serialize(() => {
     name TEXT NOT NULL,
     dept TEXT NOT NULL,
     role TEXT NOT NULL,
+    status TEXT DEFAULT 'active',
     password TEXT NOT NULL DEFAULT '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
   )`);
+
+  // 兼容旧数据：为没有status字段的用户表添加该列
+  db.run(`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'`, (err) => {
+    if (err && !err.message.includes('duplicate column')) console.log('[DB] users.status 列已存在或无需添加');
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
@@ -200,6 +206,18 @@ db.serialize(() => {
     remark TEXT,
     created TEXT
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS operation_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    user_name TEXT,
+    action TEXT,
+    target_type TEXT,
+    target_id TEXT,
+    detail TEXT,
+    ip TEXT,
+    time INTEGER
+  )`);
 });
 
 // ============ 初始化演示数据 ============
@@ -222,10 +240,15 @@ function initDemoData() {
   const defaultPassword = bcrypt.hashSync('123456', 10);
 
   db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
-    if (err || row.count > 0) return;
-    const stmt = db.prepare("INSERT INTO users (id, name, dept, role, password) VALUES (?, ?, ?, ?, ?)");
-    users.forEach(u => stmt.run(u.id, u.name, u.dept, u.role, defaultPassword));
-    stmt.finalize();
+    if (err) return;
+    if (row.count === 0) {
+      const stmt = db.prepare("INSERT INTO users (id, name, dept, role, status, password) VALUES (?, ?, ?, ?, ?, ?)");
+      users.forEach(u => stmt.run(u.id, u.name, u.dept, u.role, 'active', defaultPassword));
+      stmt.finalize();
+    } else {
+      // 兼容旧数据：将没有status的用户设为active
+      db.run("UPDATE users SET status = 'active' WHERE status IS NULL OR status = ''");
+    }
   });
 
   db.get("SELECT COUNT(*) as count FROM orders", (err, row) => {
@@ -355,7 +378,8 @@ function initPermissionsAndRoles() {
     {code:'model:view',name:'查看风机型号',module:'型号管理'},
     {code:'model:create',name:'添加风机型号',module:'型号管理'},
     {code:'model:edit',name:'修改风机型号',module:'型号管理'},
-    {code:'model:delete',name:'删除风机型号',module:'型号管理'}
+    {code:'model:delete',name:'删除风机型号',module:'型号管理'},
+    {code:'operation_log:view',name:'查看操作日志',module:'系统管理'}
   ];
   const permStmt = db.prepare("INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES (?, ?, ?, ?)");
   perms.forEach(p => permStmt.run(p.code, p.name, p.module, p.name));
@@ -386,6 +410,13 @@ function auditLog(req, action, target, detail) {
   const ip = req.ip || (req.socket && req.socket.remoteAddress) || (req.connection && req.connection.remoteAddress) || '';
   db.run("INSERT INTO audit_logs (user_id, user_name, action, target, detail, ip, time) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [user.id || null, user.name || '', action, target, detail, ip, Date.now()]);
+}
+
+function operationLog(req, action, targetType, targetId, detail) {
+  const user = req.user || {};
+  const ip = req.ip || (req.socket && req.socket.remoteAddress) || (req.connection && req.connection.remoteAddress) || '';
+  db.run("INSERT INTO operation_logs (user_id, user_name, action, target_type, target_id, detail, ip, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [user.id || null, user.name || '', action, targetType, targetId || '', detail || '', ip, Date.now()]);
 }
 
 // ============ 认证中间件 ============
@@ -439,34 +470,36 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 
 // ============ 用户 API ============
 app.get('/api/users', authMiddleware, checkPermission('user:view'), (req, res) => {
-  db.all("SELECT id, name, dept, role FROM users", [], (err, rows) => {
+  db.all("SELECT id, name, dept, role, status FROM users", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
 
 app.post('/api/users', authMiddleware, checkPermission('user:create'), (req, res) => {
-  const { id, name, dept, role, password } = req.body;
+  const { id, name, dept, role, status, password } = req.body;
   if (!name || !dept || !role) return res.status(400).json({ error: '缺少必填字段' });
   const safeName = sanitize(name);
   const safeDept = sanitize(dept);
   const safeRole = sanitize(role);
+  const safeStatus = status === 'inactive' ? 'inactive' : 'active';
   const pwd = (typeof password === 'string' && password) ? password : '123456';
   const hash = bcrypt.hashSync(pwd, 10);
-  db.run("INSERT INTO users (id, name, dept, role, password) VALUES (?, ?, ?, ?, ?)", [id || Date.now(), safeName, safeDept, safeRole, hash], function(err) {
+  db.run("INSERT INTO users (id, name, dept, role, status, password) VALUES (?, ?, ?, ?, ?, ?)", [id || Date.now(), safeName, safeDept, safeRole, safeStatus, hash], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '添加人员', 'user', safeName);
-    res.json({ id: this.lastID || id });
+    res.json({ id: this.lastID || id, name: safeName, dept: safeDept, role: safeRole, status: safeStatus });
   });
 });
 
 app.put('/api/users/:id', authMiddleware, checkPermission('user:edit'), (req, res) => {
-  const { name, dept, role } = req.body;
+  const { name, dept, role, status } = req.body;
   if (!name || !dept || !role) return res.status(400).json({ error: '缺少必填字段' });
   const safeName = sanitize(name);
   const safeDept = sanitize(dept);
   const safeRole = sanitize(role);
-  db.run("UPDATE users SET name = ?, dept = ?, role = ? WHERE id = ?", [safeName, safeDept, safeRole, req.params.id], function(err) {
+  const safeStatus = status === 'inactive' ? 'inactive' : 'active';
+  db.run("UPDATE users SET name = ?, dept = ?, role = ?, status = ? WHERE id = ?", [safeName, safeDept, safeRole, safeStatus, req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '修改人员', 'user', 'ID=' + req.params.id);
     res.json({ updated: this.changes });
@@ -477,6 +510,7 @@ app.delete('/api/users/:id', authMiddleware, checkPermission('user:delete'), (re
   db.run("DELETE FROM users WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除人员', 'user', 'ID=' + req.params.id);
+    operationLog(req, '删除人员', 'user', req.params.id, '删除用户ID=' + req.params.id);
     res.json({ deleted: this.changes });
   });
 });
@@ -527,6 +561,16 @@ app.put('/api/orders/:id', authMiddleware, checkPermission('order:edit'), (req, 
   const safeModel = model ? sanitize(model) : undefined;
   const procs = processes ? JSON.stringify(processes) : undefined;
   const qcs = qc ? JSON.stringify(qc) : undefined;
+
+  // 记录交期变更
+  if (delivery) {
+    db.get("SELECT delivery FROM orders WHERE id = ?", [req.params.id], (err, row) => {
+      if (!err && row && row.delivery !== delivery) {
+        operationLog(req, '修改交期', 'order', req.params.id, `交期从 ${row.delivery} 修改为 ${delivery}`);
+      }
+    });
+  }
+
   db.run("UPDATE orders SET customer = COALESCE(?, customer), model = COALESCE(?, model), qty = COALESCE(?, qty), delivery = COALESCE(?, delivery), status = COALESCE(?, status), processes = COALESCE(?, processes), qc = COALESCE(?, qc) WHERE id = ?",
     [safeCustomer, safeModel, qty, delivery, status, procs, qcs, req.params.id],
     function(err) {
@@ -540,6 +584,7 @@ app.delete('/api/orders/:id', authMiddleware, checkPermission('order:delete'), (
   db.run("DELETE FROM orders WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除订单', 'order', 'ID=' + req.params.id);
+    operationLog(req, '删除订单', 'order', req.params.id, '删除订单');
     res.json({ deleted: this.changes });
   });
 });
@@ -644,6 +689,7 @@ app.delete('/api/bom/:id', authMiddleware, checkPermission('bom:delete'), (req, 
   db.run("DELETE FROM bom WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除BOM', 'bom', 'ID=' + req.params.id);
+    operationLog(req, '删除BOM', 'bom', req.params.id, '删除BOM物料');
     res.json({ deleted: this.changes });
   });
 });
@@ -689,6 +735,7 @@ app.delete('/api/inventory/:id', authMiddleware, checkPermission('inventory:dele
   db.run("DELETE FROM inventory WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除库存', 'inventory', 'ID=' + req.params.id);
+    operationLog(req, '删除库存', 'inventory', req.params.id, '删除库存物料');
     res.json({ deleted: this.changes });
   });
 });
@@ -711,6 +758,7 @@ app.post('/api/inventory/in', authMiddleware, checkPermission('inventory:in'), (
       db.run("INSERT INTO inv_logs (item_id, type, item_name, qty, remark, time) VALUES (?, ?, ?, ?, ?, ?)",
         [itemId, 'in', item.name, qty, remark || '入库', Date.now()]);
       auditLog(req, '入库', 'inventory', `${item.name} +${qty}`);
+      operationLog(req, '入库', 'inventory', itemId, `${item.name} 入库 +${qty}`);
       res.json({ success: true, qty: newQty });
     });
   });
@@ -728,6 +776,7 @@ app.post('/api/inventory/out', authMiddleware, checkPermission('inventory:out'),
       db.run("INSERT INTO inv_logs (item_id, type, item_name, qty, remark, time) VALUES (?, ?, ?, ?, ?, ?)",
         [itemId, 'out', item.name, qty, remark || '出库', Date.now()]);
       auditLog(req, '出库', 'inventory', `${item.name} -${qty}`);
+      operationLog(req, '出库', 'inventory', itemId, `${item.name} 出库 -${qty}`);
       res.json({ success: true, qty: newQty });
     });
   });
@@ -735,6 +784,13 @@ app.post('/api/inventory/out', authMiddleware, checkPermission('inventory:out'),
 
 app.get('/api/audit-logs', authMiddleware, checkPermission('audit:view'), (req, res) => {
   db.all("SELECT * FROM audit_logs ORDER BY time DESC LIMIT 500", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.get('/api/operation-logs', authMiddleware, checkPermission('operation_log:view'), (req, res) => {
+  db.all("SELECT * FROM operation_logs ORDER BY time DESC LIMIT 500", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });

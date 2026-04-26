@@ -1100,6 +1100,14 @@
                         <div id="modelsList" style="display:flex;flex-direction:column;gap:10px;"></div>
                     </div>
                 </div>
+
+                <!-- 操作日志 -->
+                <div class="page" id="page-logs">
+                    <div class="section-title">📋 操作日志</div>
+                    <div id="operationLogsContent" style="padding:10px;">
+                        <div style="text-align:center;color:var(--gray);padding:40px;">加载中...</div>
+                    </div>
+                </div>
                 
                 <!-- 我的 -->
                 <div class="page" id="page-profile">
@@ -1127,6 +1135,11 @@
                         <div class="menu-item" onclick="showModelsPage()">
                             <span class="menu-icon">🔧</span>
                             <span class="menu-text">风机型号管理</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="showOperationLogsPage()" id="operationLogMenuItem" style="display:none;">
+                            <span class="menu-icon">📋</span>
+                            <span class="menu-text">操作日志</span>
                             <span class="menu-arrow">›</span>
                         </div>
                         <div class="menu-item" onclick="showChangePasswordModal()">
@@ -1375,6 +1388,10 @@
                 <option value="仓库">仓库</option>
             </select>
             <input type="text" id="addStaffRole" placeholder="职位 * (如: 工程师、经理)">
+            <select id="addStaffStatus" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);margin-top:10px;">
+                <option value="active">在职</option>
+                <option value="inactive">已离职</option>
+            </select>
             <div class="modal-btns">
                 <button class="btn btn-secondary" onclick="closeModal('addStaffModal')">取消</button>
                 <button class="btn btn-primary" onclick="addStaff()">添加</button>
@@ -1398,6 +1415,10 @@
                 <option value="仓库">仓库</option>
             </select>
             <input type="text" id="editStaffRole" placeholder="职位 *">
+            <select id="editStaffStatus" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;background:var(--light);margin-top:10px;">
+                <option value="active">在职</option>
+                <option value="inactive">已离职</option>
+            </select>
             <div class="modal-btns">
                 <button class="btn btn-secondary" onclick="closeModal('editStaffModal')">取消</button>
                 <button class="btn btn-primary" onclick="saveEditStaff()">保存</button>
@@ -1773,12 +1794,16 @@
                 addStaffBtn.style.display = 'none';
             }
             
-            // 获取权限并控制报表菜单显示
+            // 获取权限并控制菜单显示
             const perms = await apiRequest('/my-permissions') || [];
             currentUser.permissions = perms;
             const reportMenu = document.getElementById('reportMenuItem');
             if (reportMenu) {
                 reportMenu.style.display = perms.includes('report:view') ? 'flex' : 'none';
+            }
+            const logMenu = document.getElementById('operationLogMenuItem');
+            if (logMenu) {
+                logMenu.style.display = perms.includes('operation_log:view') ? 'flex' : 'none';
             }
             
             renderHome();
@@ -1885,6 +1910,54 @@
 
             html += '</div>';
             document.getElementById('reportContent').innerHTML = html;
+        }
+
+        // ============ 操作日志 ============
+        async function showOperationLogsPage() {
+            showTab('logs');
+            await loadOperationLogs();
+        }
+
+        async function loadOperationLogs() {
+            const container = document.getElementById('operationLogsContent');
+            container.innerHTML = '<div style="text-align:center;color:var(--gray);padding:40px;">加载中...</div>';
+            const data = await apiRequest('/operation-logs');
+            if (!data) {
+                container.innerHTML = '<div style="text-align:center;color:var(--danger);padding:40px;">加载失败</div>';
+                return;
+            }
+            renderOperationLogs(data);
+        }
+
+        function renderOperationLogs(logs) {
+            const container = document.getElementById('operationLogsContent');
+            if (logs.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:var(--gray);padding:40px;">暂无操作日志</div>';
+                return;
+            }
+            const actionColor = {
+                '删除订单': '#dc2626', '修改交期': '#d97706', '删除人员': '#dc2626',
+                '删除BOM': '#dc2626', '删除库存': '#dc2626', '入库': '#16a34a', '出库': '#2563eb'
+            };
+            let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+            logs.forEach(log => {
+                const time = log.time ? new Date(log.time).toLocaleString('zh-CN') : '';
+                const color = actionColor[log.action] || 'var(--gray)';
+                html += `
+                    <div class="order-card" style="padding:10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-weight:600;font-size:14px;color:${color};">${log.action}</span>
+                            <span style="font-size:11px;color:var(--gray);">${time}</span>
+                        </div>
+                        <div style="font-size:13px;margin-top:4px;">
+                            <span style="color:var(--gray);">操作人:</span> ${log.user_name || '系统'}
+                            ${log.detail ? `<span style="color:var(--gray);margin-left:8px;">详情:</span> ${log.detail}` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
         }
 
         // ============ 客户管理 ============
@@ -2118,11 +2191,26 @@
             }
         }
         
+        function getDeliveryWarning(delivery, status) {
+            if (status === 'completed') return null;
+            if (!delivery) return null;
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const d = new Date(delivery);
+            d.setHours(0,0,0,0);
+            const diff = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+            if (diff < 0) return { text: `超期 ${Math.abs(diff)} 天`, color: '#dc2626', bg: '#fee2e2' };
+            if (diff <= 3) return { text: `剩 ${diff} 天`, color: '#dc2626', bg: '#fee2e2' };
+            if (diff <= 7) return { text: `剩 ${diff} 天`, color: '#d97706', bg: '#fef3c7' };
+            return null;
+        }
+
         function createOrderCard(order) {
             const completedSteps = order.processes.filter(p => p.done).length;
             const progress = (completedSteps / 8 * 100).toFixed(0);
             const statusText = {pending:'待生产',production:'生产中',qc:'质检中',completed:'已完成',overdue:'已逾期'};
             const statusClass = order.status;
+            const warn = getDeliveryWarning(order.delivery, order.status);
             
             return `
                 <div class="order-card status-${statusClass}" onclick="showOrderDetail('${order.id}')">
@@ -2138,7 +2226,7 @@
                     </div>
                     <div class="order-meta">
                         <span>数量: ${order.qty}</span>
-                        <span>交货: ${order.delivery}</span>
+                        <span>交货: ${order.delivery}${warn ? ` <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;background:${warn.bg};color:${warn.color};font-weight:600;">${warn.text}</span>` : ''}</span>
                     </div>
                 </div>
             `;
@@ -2282,13 +2370,19 @@
             showTab('detail');
         }
         
+        function getActiveUsers() {
+            return (window.USERS || []).filter(u => u.status !== 'inactive').map(u => u.name);
+        }
+
         async function toggleProcess(idx) {
             if (!currentOrder) return;
             const proc = currentOrder.processes[idx];
             const pInfo = PROCESSES[idx];
 
             if (!proc.done) {
-                const operator = prompt(`【${pInfo.name}】操作人：`, currentUser.name) || currentUser.name;
+                const activeUsers = getActiveUsers();
+                const userList = activeUsers.length > 0 ? `\n(在职: ${activeUsers.join('、')})` : '';
+                const operator = prompt(`【${pInfo.name}】操作人：${userList}`, currentUser.name) || currentUser.name;
                 const remark = prompt(`【${pInfo.name}】备注：`) || '';
                 const abnormal = prompt(`【${pInfo.name}】异常记录：`) || '';
                 if (!confirm(`确认标记【${pInfo.name}】为已完成？\n操作人：${operator}\n备注：${remark || '无'}\n异常：${abnormal || '无'}`)) return;
@@ -3172,7 +3266,7 @@
                     </div>
                     <div class="staff-grid">
                         ${users.map(u => `
-                            <div class="staff-item">
+                            <div class="staff-item" style="${u.status === 'inactive' ? 'opacity:0.6;' : ''}">
                                 ${currentUser.dept === '管理部' ? `
                                 <div class="actions">
                                     <button class="staff-action-btn edit" onclick="showEditStaffModal(${u.id})">✏️</button>
@@ -3182,6 +3276,9 @@
                                 <div class="staff-avatar">${u.name.slice(-2)}</div>
                                 <div class="staff-name">${u.name}</div>
                                 <div class="staff-role">${u.role}</div>
+                                <div style="font-size:11px;margin-top:2px;">
+                                    <span style="display:inline-block;padding:1px 6px;border-radius:4px;background:${u.status === 'inactive' ? '#fee2e2' : '#dcfce7'};color:${u.status === 'inactive' ? '#dc2626' : '#16a34a'};">${u.status === 'inactive' ? '已离职' : '在职'}</span>
+                                </div>
                             </div>
                         `).join('')}
                     </div>
@@ -3193,6 +3290,7 @@
             document.getElementById('addStaffName').value = '';
             document.getElementById('addStaffDept').value = '技术部';
             document.getElementById('addStaffRole').value = '';
+            document.getElementById('addStaffStatus').value = 'active';
             document.getElementById('addStaffModal').classList.add('active');
         }
         
@@ -3200,6 +3298,7 @@
             const name = document.getElementById('addStaffName').value.trim();
             const dept = document.getElementById('addStaffDept').value;
             const role = document.getElementById('addStaffRole').value.trim();
+            const status = document.getElementById('addStaffStatus').value;
 
             if (!name || !role) {
                 showToast('请填写姓名和职位', 'error');
@@ -3208,20 +3307,20 @@
 
             const newStaff = {
                 id: Date.now(),
-                name, dept, role
+                name, dept, role, status
             };
 
             const res = await apiRequest('/users', { method: 'POST', body: JSON.stringify(newStaff) });
             if (!res) return;
-            window.USERS.push(newStaff);
+            window.USERS.push(res);
             closeModal('addStaffModal');
             showToast('人员添加成功', 'success');
             renderStaff();
 
             const select = document.getElementById('userSelect');
             const opt = document.createElement('option');
-            opt.value = newStaff.id;
-            opt.textContent = `${newStaff.name} (${newStaff.dept})`;
+            opt.value = res.id;
+            opt.textContent = `${res.name} (${res.dept})`;
             select.appendChild(opt);
         }
 
@@ -3233,6 +3332,7 @@
             document.getElementById('editStaffName').value = user.name;
             document.getElementById('editStaffDept').value = user.dept;
             document.getElementById('editStaffRole').value = user.role;
+            document.getElementById('editStaffStatus').value = user.status || 'active';
             document.getElementById('editStaffModal').classList.add('active');
         }
 
@@ -3244,6 +3344,7 @@
             const name = document.getElementById('editStaffName').value.trim();
             const dept = document.getElementById('editStaffDept').value;
             const role = document.getElementById('editStaffRole').value.trim();
+            const status = document.getElementById('editStaffStatus').value;
 
             if (!name || !role) {
                 showToast('请填写姓名和职位', 'error');
@@ -3252,13 +3353,14 @@
 
             const res = await apiRequest('/users/' + id, {
                 method: 'PUT',
-                body: JSON.stringify({ name, dept, role })
+                body: JSON.stringify({ name, dept, role, status })
             });
             if (!res) return;
 
             user.name = name;
             user.dept = dept;
             user.role = role;
+            user.status = status;
             closeModal('editStaffModal');
             showToast('人员信息已保存', 'success');
             renderStaff();
