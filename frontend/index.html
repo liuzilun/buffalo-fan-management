@@ -2728,101 +2728,39 @@
             };
         }
         
-        function exportBOM() {
-            const bom = window.BOM || [];
-            let csv = '\uFEFF序号,代码,型号,名称,数量,材料,单重Kg,总重Kg,单位,厂家,备注,状态\n';
-            bom.forEach((item, i) => {
-                const statusText = item.status === 'enough' ? '充足' : (item.status === 'low' ? '偏低' : '缺货');
-                csv += `${i+1},"${item.code || ''}","${item.model || ''}","${item.name}",${item.qty},"${item.material || ''}",${item.unitWeight || ''},${item.totalWeight || ''},"${item.unit || ''}","${item.manufacturer || ''}","${item.remark || ''}",${statusText}\n`;
-            });
-            
-            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+        async function exportBOM() {
+            const res = await fetch(API_BASE + '/export/bom', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (!res.ok) { showToast('导出失败', 'error'); return; }
+            const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `BOM导出_${new Date().toLocaleDateString()}.csv`;
+            const cd = res.headers.get('Content-Disposition');
+            const m = cd && cd.match(/filename="?([^"]+)"?/);
+            a.download = m ? m[1] : 'BOM导出.csv';
             a.click();
             URL.revokeObjectURL(url);
             showToast('BOM已导出', 'success');
         }
         
-        function importBOMFile(input) {
+        async function importBOMFile(input) {
             const file = input.files[0];
             if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const text = e.target.result;
-                    const lines = text.split('\n').filter(l => l.trim());
-                    
-                    if (lines.length < 2) {
-                        showToast('CSV文件内容为空或格式不正确', 'error');
-                        return;
-                    }
-                    
-                    // 跳过表头，解析数据
-                    const newItems = [];
-                    for (let i = 1; i < lines.length; i++) {
-                        const cols = parseCSVLine(lines[i]);
-                        if (cols.length >= 4) {
-                            newItems.push({
-                                id: 'BOM' + Date.now() + '_' + i,
-                                code: cols[1] || '',
-                                model: cols[2] || '',
-                                name: cols[3] || '',
-                                qty: parseInt(cols[4]) || 0,
-                                material: cols[5] || '',
-                                unitWeight: parseFloat(cols[6]) || 0,
-                                totalWeight: parseFloat(cols[7]) || 0,
-                                unit: cols[8] || '',
-                                manufacturer: cols[9] || '',
-                                remark: cols[10] || '',
-                                status: 'enough',
-                                changes: [cols[11] || '', cols[12] || '', cols[13] || '', cols[14] || '']
-                            });
-                        }
-                    }
-                    
-                    if (newItems.length > 0) {
-                        (async () => {
-                            for (const item of newItems) {
-                                await apiRequest('/bom', { method: 'POST', body: JSON.stringify(item) });
-                            }
-                            window.BOM = [...window.BOM, ...newItems];
-                            showToast(`成功导入 ${newItems.length} 条BOM数据`, 'success');
-                            renderBOM();
-                        })();
-                    } else {
-                        showToast('未找到有效数据', 'error');
-                    }
-                } catch (err) {
-                    showToast('导入失败：' + err.message, 'error');
-                }
-                input.value = '';
-            };
-            reader.readAsText(file);
-        }
-        
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current.trim());
-                    current = '';
+            const text = await file.text();
+            const res = await apiRequest('/import/bom', { method: 'POST', body: JSON.stringify({ content: text }) });
+            if (res) {
+                if (res.success) {
+                    showToast(`成功导入 ${res.count} 条BOM数据`, 'success');
+                    await loadData();
+                    renderBOM();
                 } else {
-                    current += char;
+                    showToast(`导入完成，${res.count}条成功，${res.errors.length}条失败`, res.errors.length > 0 ? 'error' : 'success');
                 }
             }
-            result.push(current.trim());
-            return result;
+            input.value = '';
         }
+        
+        // CSV解析已移至后端
         
         // ============ 库存管理 ============
         function renderInventory(tab) {
@@ -3173,79 +3111,36 @@
             renderInventory('list');
         }
         
-        function exportInventory() {
-            const inv = window.INVENTORY || [];
-            let csv = '\uFEFF编码,名称,规格,类别,材质,单位,当前库存,安全库存,最大库存,单价,库位,备注\n';
-            inv.forEach(item => {
-                csv += `"${item.id}","${item.name}","${item.spec || ''}","${item.category || ''}","${item.material || ''}","${item.unit || ''}",${item.qty},${item.min},${item.max || ''},${item.price || ''},"${item.location || ''}","${item.remark || ''}"\n`;
-            });
-            
-            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+        async function exportInventory() {
+            const res = await fetch(API_BASE + '/export/inventory', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (!res.ok) { showToast('导出失败', 'error'); return; }
+            const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `库存导出_${new Date().toLocaleDateString()}.csv`;
+            const cd = res.headers.get('Content-Disposition');
+            const m = cd && cd.match(/filename="?([^"]+)"?/);
+            a.download = m ? m[1] : '库存导出.csv';
             a.click();
             URL.revokeObjectURL(url);
             showToast('库存已导出', 'success');
         }
         
-        function importInvFile(input) {
+        async function importInvFile(input) {
             const file = input.files[0];
             if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const text = e.target.result;
-                    const lines = text.split('\n').filter(l => l.trim());
-                    
-                    if (lines.length < 2) {
-                        showToast('CSV文件内容为空或格式不正确', 'error');
-                        return;
-                    }
-                    
-                    const newItems = [];
-                    for (let i = 1; i < lines.length; i++) {
-                        const cols = parseCSVLine(lines[i]);
-                        if (cols.length >= 2) {
-                            newItems.push({
-                                id: cols[0] || 'INV' + Date.now() + '_' + i,
-                                name: cols[1] || '',
-                                spec: cols[2] || '',
-                                category: cols[3] || '',
-                                material: cols[4] || '',
-                                unit: cols[5] || '',
-                                qty: parseInt(cols[6]) || 0,
-                                min: parseInt(cols[7]) || 10,
-                                max: parseInt(cols[8]) || 0,
-                                price: parseFloat(cols[9]) || 0,
-                                location: cols[10] || '',
-                                remark: cols[11] || '',
-                                status: 'enough',
-                                changes: ['','','','']
-                            });
-                        }
-                    }
-                    
-                    if (newItems.length > 0) {
-                        (async () => {
-                            for (const item of newItems) {
-                                await apiRequest('/inventory', { method: 'POST', body: JSON.stringify(item) });
-                            }
-                            window.INVENTORY = [...window.INVENTORY, ...newItems];
-                            showToast(`成功导入 ${newItems.length} 条库存数据`, 'success');
-                            renderInventory('list');
-                        })();
-                    } else {
-                        showToast('未找到有效数据', 'error');
-                    }
-                } catch (err) {
-                    showToast('导入失败：' + err.message, 'error');
+            const text = await file.text();
+            const res = await apiRequest('/import/inventory', { method: 'POST', body: JSON.stringify({ content: text }) });
+            if (res) {
+                if (res.success) {
+                    showToast(`成功导入 ${res.count} 条库存数据`, 'success');
+                    await loadData();
+                    renderInventory('list');
+                } else {
+                    showToast(`导入完成，${res.count}条成功，${res.errors.length}条失败`, res.errors.length > 0 ? 'error' : 'success');
                 }
-                input.value = '';
-            };
-            reader.readAsText(file);
+            }
+            input.value = '';
         }
         
         // ============ 人员管理 ============
@@ -3402,70 +3297,36 @@
             };
         }
         
-        function exportStaff() {
-            const users = window.USERS || [];
-            let csv = '\uFEFF工号,姓名,部门,职位\n';
-            users.forEach(u => {
-                csv += `${u.id},"${u.name}","${u.dept}","${u.role}"\n`;
-            });
-            
-            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+        async function exportStaff() {
+            const res = await fetch(API_BASE + '/export/users', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (!res.ok) { showToast('导出失败', 'error'); return; }
+            const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `人员表_${new Date().toLocaleDateString()}.csv`;
+            const cd = res.headers.get('Content-Disposition');
+            const m = cd && cd.match(/filename="?([^"]+)"?/);
+            a.download = m ? m[1] : '人员表.csv';
             a.click();
             URL.revokeObjectURL(url);
             showToast('人员表已导出', 'success');
         }
         
-        function importStaffFile(input) {
+        async function importStaffFile(input) {
             const file = input.files[0];
             if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const text = e.target.result;
-                    const lines = text.split('\n').filter(l => l.trim());
-                    
-                    if (lines.length < 2) {
-                        showToast('CSV文件内容为空或格式不正确', 'error');
-                        return;
-                    }
-                    
-                    const newUsers = [];
-                    for (let i = 1; i < lines.length; i++) {
-                        const cols = parseCSVLine(lines[i]);
-                        if (cols.length >= 4) {
-                            newUsers.push({
-                                id: parseInt(cols[0]) || Date.now() + i,
-                                name: cols[1] || '',
-                                dept: cols[2] || '技术部',
-                                role: cols[3] || ''
-                            });
-                            window.PASSWORDS[parseInt(cols[0]) || Date.now() + i] = '123456';
-                        }
-                    }
-                    
-                    if (newUsers.length > 0) {
-                        (async () => {
-                            for (const u of newUsers) {
-                                await apiRequest('/users', { method: 'POST', body: JSON.stringify(u) });
-                            }
-                            window.USERS = [...window.USERS, ...newUsers];
-                            showToast(`成功导入 ${newUsers.length} 条人员数据`, 'success');
-                            renderStaff();
-                        })();
-                    } else {
-                        showToast('未找到有效数据', 'error');
-                    }
-                } catch (err) {
-                    showToast('导入失败：' + err.message, 'error');
+            const text = await file.text();
+            const res = await apiRequest('/import/users', { method: 'POST', body: JSON.stringify({ content: text }) });
+            if (res) {
+                if (res.success) {
+                    showToast(`成功导入 ${res.count} 条人员数据`, 'success');
+                    await loadData();
+                    renderStaff();
+                } else {
+                    showToast(`导入完成，${res.count}条成功，${res.errors.length}条失败`, res.errors.length > 0 ? 'error' : 'success');
                 }
-                input.value = '';
-            };
-            reader.readAsText(file);
+            }
+            input.value = '';
         }
         
         // ============ 消息中心 ============
@@ -3567,22 +3428,16 @@
             showToast('密码修改功能需后端配合，已刷新登录状态', 'success');
         }
         
-        function exportAllData() {
-            const data = {
-                users: window.USERS,
-                orders: window.ORDERS,
-                bom: window.BOM,
-                inventory: window.INVENTORY,
-                invLogs: window.INV_LOGS,
-                passwords: window.PASSWORDS,
-                exportTime: new Date().toISOString()
-            };
-            
-            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        async function exportAllData() {
+            const res = await fetch(API_BASE + '/export/all', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (!res.ok) { showToast('导出失败', 'error'); return; }
+            const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `巴法洛数据备份_${new Date().toLocaleDateString()}.json`;
+            const cd = res.headers.get('Content-Disposition');
+            const m = cd && cd.match(/filename="?([^"]+)"?/);
+            a.download = m ? m[1] : '巴法洛数据备份.json';
             a.click();
             URL.revokeObjectURL(url);
             showToast('数据已导出', 'success');
@@ -3595,37 +3450,16 @@
         async function doImportAllData(input) {
             const file = input.files[0];
             if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-
-                    if (data.users) {
-                        for (const u of data.users) await apiRequest('/users', { method: 'POST', body: JSON.stringify(u) });
-                        window.USERS = data.users;
-                    }
-                    if (data.orders) {
-                        for (const o of data.orders) await apiRequest('/orders', { method: 'POST', body: JSON.stringify(o) });
-                        window.ORDERS = data.orders;
-                    }
-                    if (data.bom) {
-                        for (const b of data.bom) await apiRequest('/bom', { method: 'POST', body: JSON.stringify(b) });
-                        window.BOM = data.bom;
-                    }
-                    if (data.inventory) {
-                        for (const i of data.inventory) await apiRequest('/inventory', { method: 'POST', body: JSON.stringify(i) });
-                        window.INVENTORY = data.inventory;
-                    }
-                    if (data.invLogs) window.INV_LOGS = data.invLogs;
-
-                    showToast('数据导入成功', 'success');
+            const text = await file.text();
+            const res = await apiRequest('/import/all', { method: 'POST', body: JSON.stringify({ content: text }) });
+            if (res) {
+                if (res.success) {
+                    showToast(`数据导入成功，共${res.count}条`, 'success');
                     location.reload();
-                } catch (err) {
-                    showToast('导入失败：' + err.message, 'error');
+                } else {
+                    showToast(`导入完成，${res.count}条成功，${res.errors.length}条失败`, res.errors.length > 0 ? 'error' : 'success');
                 }
-            };
-            reader.readAsText(file);
+            }
             input.value = '';
         }
         

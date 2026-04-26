@@ -972,6 +972,245 @@ app.get('/api/my-permissions', authMiddleware, (req, res) => {
   }
 });
 
+// ============ 导出/导入工具函数 ============
+function parseCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = [];
+    let current = '';
+    let inQuotes = false;
+    for (let j = 0; j < lines[i].length; j++) {
+      const char = lines[i][j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        cols.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    cols.push(current.trim());
+    result.push(cols);
+  }
+  return result;
+}
+
+function escapeCSV(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+// ============ 导出 API ============
+app.get('/api/export/:type', authMiddleware, (req, res) => {
+  const type = req.params.type;
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+  if (type === 'bom') {
+    db.all("SELECT * FROM bom", [], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      let csv = '\uFEFF序号,代码,型号,名称,数量,材料,单重Kg,总重Kg,单位,厂家,备注,状态\n';
+      rows.forEach((item, i) => {
+        const statusText = item.status === 'enough' ? '充足' : (item.status === 'low' ? '偏低' : '缺货');
+        csv += `${i+1},${escapeCSV(item.code)},${escapeCSV(item.model)},${escapeCSV(item.name)},${item.qty || 0},${escapeCSV(item.material)},${item.unitWeight || ''},${item.totalWeight || ''},${escapeCSV(item.unit)},${escapeCSV(item.manufacturer)},${escapeCSV(item.remark)},${statusText}\n`;
+      });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=BOM导出_${dateStr}.csv`);
+      res.send(csv);
+    });
+  } else if (type === 'inventory') {
+    db.all("SELECT * FROM inventory", [], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      let csv = '\uFEFF编码,名称,规格,类别,材质,单位,当前库存,安全库存,最大库存,单价,库位,备注\n';
+      rows.forEach(item => {
+        csv += `${escapeCSV(item.id)},${escapeCSV(item.name)},${escapeCSV(item.spec)},${escapeCSV(item.category)},${escapeCSV(item.material)},${escapeCSV(item.unit)},${item.qty || 0},${item.min || 10},${item.max || ''},${item.price || ''},${escapeCSV(item.location)},${escapeCSV(item.remark)}\n`;
+      });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=库存导出_${dateStr}.csv`);
+      res.send(csv);
+    });
+  } else if (type === 'users') {
+    db.all("SELECT id, name, dept, role, status FROM users", [], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      let csv = '\uFEFF工号,姓名,部门,职位,状态\n';
+      rows.forEach(u => {
+        csv += `${u.id},${escapeCSV(u.name)},${escapeCSV(u.dept)},${escapeCSV(u.role)},${u.status === 'inactive' ? '已离职' : '在职'}\n`;
+      });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=人员表_${dateStr}.csv`);
+      res.send(csv);
+    });
+  } else if (type === 'all') {
+    db.all("SELECT id, name, dept, role, status FROM users", [], (err, users) => {
+      if (err) return res.status(500).json({ error: err.message });
+      db.all("SELECT * FROM orders", [], (err, orders) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.all("SELECT * FROM bom", [], (err, bom) => {
+          if (err) return res.status(500).json({ error: err.message });
+          db.all("SELECT * FROM inventory", [], (err, inventory) => {
+            if (err) return res.status(500).json({ error: err.message });
+            db.all("SELECT * FROM inv_logs", [], (err, invLogs) => {
+              if (err) return res.status(500).json({ error: err.message });
+              const data = { users, orders, bom, inventory, invLogs, exportTime: new Date().toISOString() };
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.setHeader('Content-Disposition', `attachment; filename=巴法洛数据备份_${dateStr}.json`);
+              res.send(JSON.stringify(data, null, 2));
+            });
+          });
+        });
+      });
+    });
+  } else {
+    res.status(400).json({ error: '不支持的导出类型' });
+  }
+});
+
+// ============ 导入 API ============
+app.post('/api/import/:type', authMiddleware, (req, res) => {
+  const type = req.params.type;
+  const content = req.body.content;
+  if (!content || typeof content !== 'string') {
+    return res.status(400).json({ error: '缺少文件内容' });
+  }
+
+  const errors = [];
+  const results = { count: 0, errors: [] };
+
+  function finish() {
+    res.json({ success: results.errors.length === 0, count: results.count, errors: results.errors });
+  }
+
+  if (type === 'bom') {
+    const rows = parseCSV(content);
+    if (rows.length === 0) return res.status(400).json({ error: 'CSV文件内容为空或格式不正确' });
+    const stmt = db.prepare("INSERT OR REPLACE INTO bom (id, code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, changes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    let pending = rows.length;
+    rows.forEach((cols, idx) => {
+      if (cols.length < 4) {
+        results.errors.push(`第${idx+2}行: 列数不足`);
+        pending--; if (pending === 0) { stmt.finalize(); finish(); }
+        return;
+      }
+      const id = 'BOM' + Date.now() + '_' + idx;
+      stmt.run(id, cols[1] || '', cols[2] || '', cols[3] || '', parseInt(cols[4]) || 0, cols[5] || '', parseFloat(cols[6]) || 0, parseFloat(cols[7]) || 0, cols[8] || '', cols[9] || '', cols[10] || '', 'enough', JSON.stringify(['','','','']), function(err) {
+        if (err) results.errors.push(`第${idx+2}行: ${err.message}`);
+        else results.count++;
+        pending--; if (pending === 0) { stmt.finalize(); finish(); }
+      });
+    });
+    operationLog(req, '批量导入BOM', 'bom', '', `导入${results.count}条BOM`);
+  } else if (type === 'inventory') {
+    const rows = parseCSV(content);
+    if (rows.length === 0) return res.status(400).json({ error: 'CSV文件内容为空或格式不正确' });
+    const stmt = db.prepare("INSERT OR REPLACE INTO inventory (id, name, spec, category, material, qty, min, max, unit, price, location, remark, status, changes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    let pending = rows.length;
+    rows.forEach((cols, idx) => {
+      if (cols.length < 2) {
+        results.errors.push(`第${idx+2}行: 列数不足`);
+        pending--; if (pending === 0) { stmt.finalize(); finish(); }
+        return;
+      }
+      const id = cols[0] || ('INV' + Date.now() + '_' + idx);
+      stmt.run(id, cols[1] || '', cols[2] || '', cols[3] || '', cols[4] || '', parseInt(cols[6]) || 0, parseInt(cols[7]) || 10, parseInt(cols[8]) || 0, cols[5] || '', parseFloat(cols[9]) || 0, cols[10] || '', cols[11] || '', 'enough', JSON.stringify(['','','','']), function(err) {
+        if (err) results.errors.push(`第${idx+2}行: ${err.message}`);
+        else results.count++;
+        pending--; if (pending === 0) { stmt.finalize(); finish(); }
+      });
+    });
+    operationLog(req, '批量导入库存', 'inventory', '', `导入${results.count}条库存`);
+  } else if (type === 'users') {
+    const rows = parseCSV(content);
+    if (rows.length === 0) return res.status(400).json({ error: 'CSV文件内容为空或格式不正确' });
+    const defaultPassword = bcrypt.hashSync('123456', 10);
+    const stmt = db.prepare("INSERT OR REPLACE INTO users (id, name, dept, role, status, password) VALUES (?, ?, ?, ?, ?, ?)");
+    let pending = rows.length;
+    rows.forEach((cols, idx) => {
+      if (cols.length < 4) {
+        results.errors.push(`第${idx+2}行: 列数不足`);
+        pending--; if (pending === 0) { stmt.finalize(); finish(); }
+        return;
+      }
+      const id = parseInt(cols[0]) || (Date.now() + idx);
+      const name = cols[1] || '';
+      const dept = cols[2] || '技术部';
+      const role = cols[3] || '';
+      const status = (cols[4] && cols[4].trim() === '已离职') ? 'inactive' : 'active';
+      stmt.run(id, name, dept, role, status, defaultPassword, function(err) {
+        if (err) results.errors.push(`第${idx+2}行: ${err.message}`);
+        else results.count++;
+        pending--; if (pending === 0) { stmt.finalize(); finish(); }
+      });
+    });
+    operationLog(req, '批量导入人员', 'users', '', `导入${results.count}条人员`);
+  } else if (type === 'all') {
+    try {
+      const data = JSON.parse(content);
+      let pendingTables = 0;
+      function checkDone() {
+        pendingTables--; if (pendingTables <= 0) finish();
+      }
+      if (data.users && data.users.length > 0) {
+        pendingTables++;
+        const stmt = db.prepare("INSERT OR REPLACE INTO users (id, name, dept, role, status, password) VALUES (?, ?, ?, ?, ?, ?)");
+        const defaultPassword = bcrypt.hashSync('123456', 10);
+        let p = data.users.length;
+        data.users.forEach(u => {
+          stmt.run(u.id, u.name, u.dept, u.role, u.status || 'active', defaultPassword, function(err) {
+            if (!err) results.count++;
+            p--; if (p === 0) { stmt.finalize(); checkDone(); }
+          });
+        });
+      }
+      if (data.orders && data.orders.length > 0) {
+        pendingTables++;
+        const stmt = db.prepare("INSERT OR REPLACE INTO orders (id, customer, model, qty, delivery, status, processes, qc, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        let p = data.orders.length;
+        data.orders.forEach(o => {
+          stmt.run(o.id, o.customer, o.model, o.qty || 1, o.delivery, o.status || 'pending', o.processes, o.qc, o.created, function(err) {
+            if (!err) results.count++;
+            p--; if (p === 0) { stmt.finalize(); checkDone(); }
+          });
+        });
+      }
+      if (data.bom && data.bom.length > 0) {
+        pendingTables++;
+        const stmt = db.prepare("INSERT OR REPLACE INTO bom (id, code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, changes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        let p = data.bom.length;
+        data.bom.forEach(b => {
+          stmt.run(b.id, b.code, b.model, b.name, b.qty || 0, b.material, b.unitWeight, b.totalWeight, b.unit, b.manufacturer, b.remark, b.status || 'enough', JSON.stringify(b.changes || ['','','','']), function(err) {
+            if (!err) results.count++;
+            p--; if (p === 0) { stmt.finalize(); checkDone(); }
+          });
+        });
+      }
+      if (data.inventory && data.inventory.length > 0) {
+        pendingTables++;
+        const stmt = db.prepare("INSERT OR REPLACE INTO inventory (id, name, spec, category, material, qty, min, max, unit, price, location, remark, status, changes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        let p = data.inventory.length;
+        data.inventory.forEach(i => {
+          stmt.run(i.id, i.name, i.spec, i.category, i.material, i.qty || 0, i.min || 10, i.max || 0, i.unit, i.price, i.location, i.remark, i.status || 'enough', JSON.stringify(i.changes || ['','','','']), function(err) {
+            if (!err) results.count++;
+            p--; if (p === 0) { stmt.finalize(); checkDone(); }
+          });
+        });
+      }
+      if (pendingTables === 0) finish();
+      operationLog(req, '全量数据恢复', 'all', '', '从备份JSON恢复数据');
+    } catch (err) {
+      res.status(400).json({ error: 'JSON解析失败: ' + err.message });
+    }
+  } else {
+    res.status(400).json({ error: '不支持的导入类型' });
+  }
+});
+
 // ============ 静态文件 & 启动 ============
 const publicPath = path.join(__dirname, '..', 'frontend');
 app.use(express.static(publicPath));
