@@ -1535,11 +1535,11 @@
         
         // ============ 初始化 ============
         async function init() {
-            await loadData();
             document.getElementById('currentDate').textContent = new Date().toLocaleDateString('zh-CN', {month:'short', day:'numeric'});
 
             const select = document.getElementById('userSelect');
             select.innerHTML = '<option value="">-- 请选择 --</option>';
+            window.USERS = [...USERS_DATA];
             window.USERS.forEach(u => {
                 const opt = document.createElement('option');
                 opt.value = u.id;
@@ -1547,8 +1547,9 @@
                 select.appendChild(opt);
             });
 
-            // 如果有token，尝试自动登录
+            // 如果有token，加载数据并尝试自动登录
             if (authToken) {
+                await loadData();
                 const me = await apiRequest('/auth/me');
                 if (me) {
                     currentUser = me;

@@ -15,9 +15,9 @@ const PORT = process.env.PORT || 3000;
 const SERVER_IP = '8.130.185.30';
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.warn('[SECURITY] 警告：未设置环境变量 JWT_SECRET，正在使用随机生成的临时密钥。生产环境请务必设置强密钥！');
+  console.warn('[SECURITY] 警告：未设置环境变量 JWT_SECRET，正在使用固定默认密钥。生产环境请务必设置强密钥！');
 }
-const SECRET = JWT_SECRET || require('crypto').randomBytes(32).toString('hex');
+const SECRET = JWT_SECRET || 'buffalo_default_jwt_secret_2024_v7';
 
 // ============ 安全中间件 ============
 app.disable('x-powered-by');
