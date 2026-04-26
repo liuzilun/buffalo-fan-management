@@ -1386,7 +1386,36 @@
     <input type="file" id="importAllFile" accept=".json" style="display:none;" onchange="doImportAllData(this)">
 
     <script>
-        // ============ 演示数据 ============
+        // ============ API 配置 ============
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:3000/api' : '/api';
+        let authToken = localStorage.getItem('buffalo_token_v7') || null;
+
+        async function apiRequest(url, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+            try {
+                const res = await fetch(API_BASE + url, { ...options, headers });
+                if (res.status === 401) {
+                    showToast('登录已过期，请重新登录', 'error');
+                    logout();
+                    return null;
+                }
+                const data = await res.json();
+                if (!res.ok) {
+                    showToast(data.error || '请求失败', 'error');
+                    return null;
+                }
+                return data;
+            } catch (err) {
+                showToast('网络错误：' + err.message, 'error');
+                return null;
+            }
+        }
+
+        // ============ 演示数据（作为fallback） ============
         const USERS_DATA = [
             {id:1, name:'张总', dept:'管理部', role:'总经理'},
             {id:2, name:'李经理', dept:'管理部', role:'经理'},
@@ -1471,89 +1500,86 @@
         let invTab = 'list';
         let deleteCallback = null;
         
-        // ============ 数据持久化 ============
-        function loadData() {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const data = JSON.parse(saved);
-                window.USERS = data.users || [...USERS_DATA];
-                window.ORDERS = data.orders || [...ORDERS_DATA];
-                window.BOM = data.bom || [...BOM_DATA];
-                window.INVENTORY = data.inventory || [...INVENTORY_DATA];
-                window.INV_LOGS = data.invLogs || [];
-                window.PASSWORDS = data.passwords || {default: '123456'};
-            } else {
-                window.USERS = [...USERS_DATA];
-                window.ORDERS = [...ORDERS_DATA];
-                window.BOM = [...BOM_DATA];
-                window.INVENTORY = [...INVENTORY_DATA];
-                window.INV_LOGS = [];
-                window.PASSWORDS = {default: '123456'};
-            }
+        // ============ 数据持久化（改为后端API） ============
+        async function loadData() {
+            const [users, orders, bom, inventory, logs] = await Promise.all([
+                apiRequest('/users'),
+                apiRequest('/orders'),
+                apiRequest('/bom'),
+                apiRequest('/inventory'),
+                apiRequest('/inventory/logs')
+            ]);
+            window.USERS = users || [...USERS_DATA];
+            window.ORDERS = orders || [...ORDERS_DATA];
+            window.BOM = bom || [...BOM_DATA];
+            window.INVENTORY = inventory || [...INVENTORY_DATA];
+            window.INV_LOGS = logs || [];
         }
-        
+
         function saveData() {
-            const data = {
-                users: window.USERS,
-                orders: window.ORDERS,
-                bom: window.BOM,
-                inventory: window.INVENTORY,
-                invLogs: window.INV_LOGS,
-                passwords: window.PASSWORDS
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            // 数据已由后端API自动持久化，此函数保留兼容旧代码调用
         }
-        
-        function resetAllData() {
-            localStorage.removeItem(STORAGE_KEY);
+
+        async function resetAllData() {
+            localStorage.removeItem('buffalo_token_v7');
             localStorage.removeItem('buffalo_current_user_v7');
             location.reload();
         }
         
         // ============ 初始化 ============
-        function init() {
-            loadData();
+        async function init() {
+            await loadData();
             document.getElementById('currentDate').textContent = new Date().toLocaleDateString('zh-CN', {month:'short', day:'numeric'});
-            
+
             const select = document.getElementById('userSelect');
+            select.innerHTML = '<option value="">-- 请选择 --</option>';
             window.USERS.forEach(u => {
                 const opt = document.createElement('option');
                 opt.value = u.id;
                 opt.textContent = `${u.name} (${u.dept})`;
                 select.appendChild(opt);
             });
-            
-            const savedUser = localStorage.getItem('buffalo_current_user_v7');
-            if (savedUser) {
-                const userData = JSON.parse(savedUser);
-                currentUser = window.USERS.find(u => u.id === userData.id);
-                if (currentUser) {
+
+            // 如果有token，尝试自动登录
+            if (authToken) {
+                const me = await apiRequest('/auth/me');
+                if (me) {
+                    currentUser = me;
                     showMainApp();
                     return;
                 }
             }
+
+            const savedUser = localStorage.getItem('buffalo_current_user_v7');
+            if (savedUser && !authToken) {
+                localStorage.removeItem('buffalo_current_user_v7');
+            }
         }
-        
+
         // ============ 登录 ============
-        function login() {
+        async function login() {
             const userId = document.getElementById('userSelect').value;
             const password = document.getElementById('passwordInput').value;
-            
+
             if (!userId) { showToast('请选择账号', 'error'); return; }
             if (!password) { showToast('请输入密码', 'error'); return; }
-            
-            const user = window.USERS.find(u => u.id == userId);
-            if (!user) { showToast('用户不存在', 'error'); return; }
-            
-            const storedPass = window.PASSWORDS[userId] || '123456';
-            if (password !== storedPass) { showToast('密码错误', 'error'); return; }
-            
-            currentUser = user;
-            localStorage.setItem('buffalo_current_user_v7', JSON.stringify({id: user.id, name: user.name}));
+
+            const res = await apiRequest('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ userId: parseInt(userId), password })
+            });
+            if (!res) return;
+
+            authToken = res.token;
+            localStorage.setItem('buffalo_token_v7', authToken);
+            currentUser = res.user;
+            localStorage.setItem('buffalo_current_user_v7', JSON.stringify({id: currentUser.id, name: currentUser.name}));
             showMainApp();
         }
-        
+
         function logout() {
+            authToken = null;
+            localStorage.removeItem('buffalo_token_v7');
             localStorage.removeItem('buffalo_current_user_v7');
             location.reload();
         }
@@ -1807,15 +1833,14 @@
             showTab('detail');
         }
         
-        function toggleProcess(idx) {
+        async function toggleProcess(idx) {
             if (!currentOrder) return;
             currentOrder.processes[idx] = !currentOrder.processes[idx];
-            
-            // 更新状态
+
             const allCompleted = currentOrder.processes.every(p => p);
             const anyInProgress = currentOrder.processes.some(p => p);
             const qcDone = currentOrder.qc.every(q => q);
-            
+
             if (allCompleted && qcDone) {
                 currentOrder.status = 'completed';
             } else if (anyInProgress) {
@@ -1823,15 +1848,25 @@
             } else {
                 currentOrder.status = 'pending';
             }
-            
-            // 检查逾期
+
             const today = new Date();
             const delivery = new Date(currentOrder.delivery);
             if (currentOrder.status !== 'completed' && delivery < today) {
                 currentOrder.status = 'overdue';
             }
-            
-            saveData();
+
+            await apiRequest('/orders/' + encodeURIComponent(currentOrder.id), {
+                method: 'PUT',
+                body: JSON.stringify({
+                    customer: currentOrder.customer,
+                    model: currentOrder.model,
+                    qty: currentOrder.qty,
+                    delivery: currentOrder.delivery,
+                    status: currentOrder.status,
+                    processes: currentOrder.processes,
+                    qc: currentOrder.qc
+                })
+            });
             showOrderDetail(currentOrder.id);
         }
         
@@ -1845,23 +1880,23 @@
             document.getElementById('addOrderModal').classList.add('active');
         }
         
-        function addOrder() {
+        async function addOrder() {
             const id = document.getElementById('addOrderId').value.trim();
             const customer = document.getElementById('addOrderCustomer').value.trim();
             const model = document.getElementById('addOrderModel').value.trim();
             const qty = parseInt(document.getElementById('addOrderQty').value) || 1;
             const delivery = document.getElementById('addOrderDelivery').value;
-            
+
             if (!id || !customer || !model) {
                 showToast('请填写必填字段', 'error');
                 return;
             }
-            
+
             if (window.ORDERS.find(o => o.id === id)) {
                 showToast('订单号已存在', 'error');
                 return;
             }
-            
+
             const newOrder = {
                 id, customer, model, qty, delivery,
                 status: 'pending',
@@ -1869,9 +1904,10 @@
                 qc: Array(6).fill(false),
                 created: new Date().toISOString()
             };
-            
+
+            const res = await apiRequest('/orders', { method: 'POST', body: JSON.stringify(newOrder) });
+            if (!res) return;
             window.ORDERS.push(newOrder);
-            saveData();
             closeModal('addOrderModal');
             showToast('订单创建成功', 'success');
             renderOrders();
@@ -1892,19 +1928,17 @@
             document.getElementById('editOrderModal').classList.add('active');
         }
         
-        function saveEditOrder() {
+        async function saveEditOrder() {
             const orderId = document.getElementById('editOrderId').value;
             const order = window.ORDERS.find(o => o.id === orderId);
             if (!order) return;
-            
+
             const newStatus = document.getElementById('editOrderStatus').value;
-            
+
             // 完工状态保护逻辑
             if (newStatus === 'completed' && order.status !== 'completed') {
-                // 检查是否满足完工条件
                 const allProcessesDone = order.processes.every(p => p);
                 const allQCDone = order.qc.every(q => q);
-                
                 if (!allProcessesDone) {
                     showToast('所有工序未完成，不能设为完工状态', 'error');
                     return;
@@ -1914,35 +1948,43 @@
                     return;
                 }
             }
-            
-            order.id = document.getElementById('editOrderNum').value.trim();
-            order.customer = document.getElementById('editOrderCustomer').value.trim();
-            order.model = document.getElementById('editOrderModel').value.trim();
-            order.qty = parseInt(document.getElementById('editOrderQty').value) || 1;
-            order.delivery = document.getElementById('editOrderDelivery').value;
-            order.status = newStatus;
-            
-            saveData();
+
+            const updated = {
+                id: document.getElementById('editOrderNum').value.trim(),
+                customer: document.getElementById('editOrderCustomer').value.trim(),
+                model: document.getElementById('editOrderModel').value.trim(),
+                qty: parseInt(document.getElementById('editOrderQty').value) || 1,
+                delivery: document.getElementById('editOrderDelivery').value,
+                status: newStatus,
+                processes: order.processes,
+                qc: order.qc
+            };
+
+            const res = await apiRequest('/orders/' + encodeURIComponent(orderId), { method: 'PUT', body: JSON.stringify(updated) });
+            if (!res) return;
+
+            Object.assign(order, updated);
             closeModal('editOrderModal');
             showToast('订单已保存', 'success');
             renderOrders();
             renderHome();
-            
+
             if (currentOrder && currentOrder.id === orderId) {
                 showOrderDetail(order.id);
             }
         }
-        
-        function deleteOrder(orderId) {
+
+        async function deleteOrder(orderId) {
             const order = window.ORDERS.find(o => o.id === orderId);
             if (!order) return;
-            
+
             document.getElementById('deleteConfirmText').textContent = `确定要删除订单 "${order.id}" 吗？`;
-            deleteCallback = () => {
+            deleteCallback = async () => {
+                const res = await apiRequest('/orders/' + encodeURIComponent(orderId), { method: 'DELETE' });
+                if (!res) return;
                 const idx = window.ORDERS.findIndex(o => o.id === orderId);
                 if (idx !== -1) {
                     window.ORDERS.splice(idx, 1);
-                    saveData();
                     showToast('订单已删除', 'success');
                     showTab('orders');
                     renderHome();
@@ -1990,13 +2032,13 @@
             document.getElementById('addBOMModal').classList.add('active');
         }
         
-        function addBOM() {
+        async function addBOM() {
             const name = document.getElementById('addBomName').value.trim();
             if (!name) {
                 showToast('请填写物料名称', 'error');
                 return;
             }
-            
+
             const newBOM = {
                 id: 'BOM' + Date.now(),
                 code: document.getElementById('addBomCode').value.trim(),
@@ -2012,18 +2054,19 @@
                 status: 'enough',
                 changes: ['','','','']
             };
-            
+
+            const res = await apiRequest('/bom', { method: 'POST', body: JSON.stringify(newBOM) });
+            if (!res) return;
             window.BOM.push(newBOM);
-            saveData();
             closeModal('addBOMModal');
             showToast('BOM物料添加成功', 'success');
             renderBOM();
         }
-        
+
         function showEditBOMModal(id) {
             const item = window.BOM.find(b => b.id === id);
             if (!item) return;
-            
+
             document.getElementById('editBomId').value = id;
             document.getElementById('editBomCode').value = item.code || '';
             document.getElementById('editBomModel').value = item.model || '';
@@ -2037,45 +2080,52 @@
             document.getElementById('editBomRemark').value = item.remark || '';
             document.getElementById('editBOMModal').classList.add('active');
         }
-        
-        function saveEditBOM() {
+
+        async function saveEditBOM() {
             const id = document.getElementById('editBomId').value;
             const item = window.BOM.find(b => b.id === id);
             if (!item) return;
-            
+
             const name = document.getElementById('editBomName').value.trim();
             if (!name) {
                 showToast('请填写物料名称', 'error');
                 return;
             }
-            
-            item.code = document.getElementById('editBomCode').value.trim();
-            item.model = document.getElementById('editBomModel').value.trim();
-            item.name = name;
-            item.qty = parseInt(document.getElementById('editBomQty').value) || 0;
-            item.material = document.getElementById('editBomMaterial').value.trim();
-            item.unitWeight = parseFloat(document.getElementById('editBomUnitWeight').value) || 0;
-            item.totalWeight = parseFloat(document.getElementById('editBomTotalWeight').value) || 0;
-            item.unit = document.getElementById('editBomUnit').value.trim();
-            item.manufacturer = document.getElementById('editBomManufacturer').value.trim();
-            item.remark = document.getElementById('editBomRemark').value.trim();
-            
-            saveData();
+
+            const updated = {
+                code: document.getElementById('editBomCode').value.trim(),
+                model: document.getElementById('editBomModel').value.trim(),
+                name,
+                qty: parseInt(document.getElementById('editBomQty').value) || 0,
+                material: document.getElementById('editBomMaterial').value.trim(),
+                unitWeight: parseFloat(document.getElementById('editBomUnitWeight').value) || 0,
+                totalWeight: parseFloat(document.getElementById('editBomTotalWeight').value) || 0,
+                unit: document.getElementById('editBomUnit').value.trim(),
+                manufacturer: document.getElementById('editBomManufacturer').value.trim(),
+                remark: document.getElementById('editBomRemark').value.trim(),
+                status: item.status,
+                changes: item.changes
+            };
+
+            const res = await apiRequest('/bom/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(updated) });
+            if (!res) return;
+            Object.assign(item, updated);
             closeModal('editBOMModal');
             showToast('BOM物料已保存', 'success');
             renderBOM();
         }
-        
-        function deleteBOM(id) {
+
+        async function deleteBOM(id) {
             const item = window.BOM.find(b => b.id === id);
             if (!item) return;
-            
+
             document.getElementById('deleteConfirmText').textContent = `确定要删除BOM物料 "${item.name}" 吗？`;
-            deleteCallback = () => {
+            deleteCallback = async () => {
+                const res = await apiRequest('/bom/' + encodeURIComponent(id), { method: 'DELETE' });
+                if (!res) return;
                 const idx = window.BOM.findIndex(b => b.id === id);
                 if (idx !== -1) {
                     window.BOM.splice(idx, 1);
-                    saveData();
                     showToast('BOM物料已删除', 'success');
                     renderBOM();
                 }
@@ -2144,10 +2194,14 @@
                     }
                     
                     if (newItems.length > 0) {
-                        window.BOM = [...window.BOM, ...newItems];
-                        saveData();
-                        showToast(`成功导入 ${newItems.length} 条BOM数据`, 'success');
-                        renderBOM();
+                        (async () => {
+                            for (const item of newItems) {
+                                await apiRequest('/bom', { method: 'POST', body: JSON.stringify(item) });
+                            }
+                            window.BOM = [...window.BOM, ...newItems];
+                            showToast(`成功导入 ${newItems.length} 条BOM数据`, 'success');
+                            renderBOM();
+                        })();
                     } else {
                         showToast('未找到有效数据', 'error');
                     }
@@ -2317,15 +2371,15 @@
             document.getElementById('addInvModal').classList.add('active');
         }
         
-        function addInventory() {
+        async function addInventory() {
             const name = document.getElementById('addInvName').value.trim();
             const id = document.getElementById('addInvCode').value.trim();
-            
+
             if (!name || !id) {
                 showToast('请填写物料名称和编码', 'error');
                 return;
             }
-            
+
             const newInv = {
                 id,
                 name,
@@ -2342,18 +2396,19 @@
                 status: 'enough',
                 changes: ['','','','']
             };
-            
+
+            const res = await apiRequest('/inventory', { method: 'POST', body: JSON.stringify(newInv) });
+            if (!res) return;
             window.INVENTORY.push(newInv);
-            saveData();
             closeModal('addInvModal');
             showToast('库存物料添加成功', 'success');
             renderInventory('list');
         }
-        
+
         function showEditInvModal(id) {
             const item = window.INVENTORY.find(i => i.id === id);
             if (!item) return;
-            
+
             document.getElementById('editInvId').value = id;
             document.getElementById('editInvCode').value = item.id;
             document.getElementById('editInvName').value = item.name;
@@ -2369,47 +2424,54 @@
             document.getElementById('editInvRemark').value = item.remark || '';
             document.getElementById('editInvModal').classList.add('active');
         }
-        
-        function saveEditInventory() {
+
+        async function saveEditInventory() {
             const id = document.getElementById('editInvId').value;
             const item = window.INVENTORY.find(i => i.id === id);
             if (!item) return;
-            
+
             const name = document.getElementById('editInvName').value.trim();
             if (!name) {
                 showToast('请填写物料名称', 'error');
                 return;
             }
-            
+
+            const updated = {
+                name,
+                spec: document.getElementById('editInvSpec').value.trim(),
+                category: document.getElementById('editInvCategory').value.trim(),
+                material: document.getElementById('editInvMaterial').value.trim(),
+                unit: document.getElementById('editInvUnit').value.trim(),
+                qty: parseInt(document.getElementById('editInvQty').value) || 0,
+                min: parseInt(document.getElementById('editInvMin').value) || 10,
+                max: parseInt(document.getElementById('editInvMax').value) || 0,
+                price: parseFloat(document.getElementById('editInvPrice').value) || 0,
+                location: document.getElementById('editInvLocation').value.trim(),
+                remark: document.getElementById('editInvRemark').value.trim(),
+                status: item.status,
+                changes: item.changes
+            };
+
+            const res = await apiRequest('/inventory/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(updated) });
+            if (!res) return;
+            Object.assign(item, updated);
             item.id = document.getElementById('editInvCode').value.trim();
-            item.name = name;
-            item.spec = document.getElementById('editInvSpec').value.trim();
-            item.category = document.getElementById('editInvCategory').value.trim();
-            item.material = document.getElementById('editInvMaterial').value.trim();
-            item.unit = document.getElementById('editInvUnit').value.trim();
-            item.qty = parseInt(document.getElementById('editInvQty').value) || 0;
-            item.min = parseInt(document.getElementById('editInvMin').value) || 10;
-            item.max = parseInt(document.getElementById('editInvMax').value) || 0;
-            item.price = parseFloat(document.getElementById('editInvPrice').value) || 0;
-            item.location = document.getElementById('editInvLocation').value.trim();
-            item.remark = document.getElementById('editInvRemark').value.trim();
-            
-            saveData();
             closeModal('editInvModal');
             showToast('库存物料已保存', 'success');
             renderInventory('list');
         }
-        
-        function deleteInventory(id) {
+
+        async function deleteInventory(id) {
             const item = window.INVENTORY.find(i => i.id === id);
             if (!item) return;
-            
+
             document.getElementById('deleteConfirmText').textContent = `确定要删除库存物料 "${item.name}" 吗？`;
-            deleteCallback = () => {
+            deleteCallback = async () => {
+                const res = await apiRequest('/inventory/' + encodeURIComponent(id), { method: 'DELETE' });
+                if (!res) return;
                 const idx = window.INVENTORY.findIndex(i => i.id === id);
                 if (idx !== -1) {
                     window.INVENTORY.splice(idx, 1);
-                    saveData();
                     showToast('库存物料已删除', 'success');
                     renderInventory('list');
                 }
@@ -2420,121 +2482,102 @@
                 if (deleteCallback) deleteCallback();
             };
         }
-        
-        function doInStock() {
+
+        async function doInStock() {
             const id = document.getElementById('invInSelect').value;
             const qty = parseInt(document.getElementById('invInQty').value) || 0;
             const remark = document.getElementById('invInRemark').value.trim();
-            
+
             if (qty <= 0) {
                 showToast('请输入有效的入库数量', 'error');
                 return;
             }
-            
-            const item = window.INVENTORY.find(i => i.id === id);
-            if (!item) return;
-            
-            item.qty += qty;
-            window.INV_LOGS.push({
-                type: 'in',
-                item: item.name,
-                qty: qty,
-                remark: remark || '入库',
-                time: Date.now()
+
+            const res = await apiRequest('/inventory/in', {
+                method: 'POST',
+                body: JSON.stringify({ itemId: id, qty, remark: remark || '入库' })
             });
-            
-            saveData();
-            showToast(`入库成功：${item.name} +${qty}`, 'success');
+            if (!res) return;
+
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (item) item.qty = res.qty;
+            window.INV_LOGS.push({ type: 'in', item: item ? item.name : id, qty, remark: remark || '入库', time: Date.now() });
+            showToast(`入库成功：${item ? item.name : id} +${qty}`, 'success');
             renderInventory('list');
         }
-        
-        function doOutStock() {
+
+        async function doOutStock() {
             const id = document.getElementById('invOutSelect').value;
             const qty = parseInt(document.getElementById('invOutQty').value) || 0;
             const remark = document.getElementById('invOutRemark').value.trim();
-            
+
             if (qty <= 0) {
                 showToast('请输入有效的出库数量', 'error');
                 return;
             }
-            
-            const item = window.INVENTORY.find(i => i.id === id);
-            if (!item) return;
-            
-            if (item.qty < qty) {
-                showToast('库存不足，当前库存：' + item.qty, 'error');
-                return;
-            }
-            
-            item.qty -= qty;
-            window.INV_LOGS.push({
-                type: 'out',
-                item: item.name,
-                qty: qty,
-                remark: remark || '出库',
-                time: Date.now()
+
+            const res = await apiRequest('/inventory/out', {
+                method: 'POST',
+                body: JSON.stringify({ itemId: id, qty, remark: remark || '出库' })
             });
-            
-            saveData();
-            showToast(`出库成功：${item.name} -${qty}`, 'success');
+            if (!res) return;
+
+            const item = window.INVENTORY.find(i => i.id === id);
+            if (item) item.qty = res.qty;
+            window.INV_LOGS.push({ type: 'out', item: item ? item.name : id, qty, remark: remark || '出库', time: Date.now() });
+            showToast(`出库成功：${item ? item.name : id} -${qty}`, 'success');
             renderInventory('list');
         }
-        
-        function doInStockOne(id) {
+
+        async function doInStockOne(id) {
             const item = window.INVENTORY.find(i => i.id === id);
             if (!item) return;
-            
+
             const qty = prompt(`📥 入库 - "${item.name}"\n当前库存: ${item.qty} ${item.unit}\n请输入入库数量：`, '1');
             if (qty === null) return;
-            
+
             const qtyNum = parseInt(qty);
             if (isNaN(qtyNum) || qtyNum <= 0) {
                 showToast('请输入有效数量', 'error');
                 return;
             }
-            
-            item.qty += qtyNum;
-            window.INV_LOGS.push({
-                type: 'in',
-                item: item.name,
-                qty: qtyNum,
-                remark: '快速入库',
-                time: Date.now()
+
+            const res = await apiRequest('/inventory/in', {
+                method: 'POST',
+                body: JSON.stringify({ itemId: id, qty: qtyNum, remark: '快速入库' })
             });
-            
-            saveData();
+            if (!res) return;
+            item.qty = res.qty;
+            window.INV_LOGS.push({ type: 'in', item: item.name, qty: qtyNum, remark: '快速入库', time: Date.now() });
             showToast(`入库成功：${item.name} +${qtyNum}`, 'success');
             renderInventory('list');
         }
-        
-        function doOutStockOne(id) {
+
+        async function doOutStockOne(id) {
             const item = window.INVENTORY.find(i => i.id === id);
             if (!item) return;
-            
+
             const qty = prompt(`📤 出库 - "${item.name}"\n当前库存: ${item.qty} ${item.unit}\n请输入出库数量：`, '1');
             if (qty === null) return;
-            
+
             const qtyNum = parseInt(qty);
             if (isNaN(qtyNum) || qtyNum <= 0) {
                 showToast('请输入有效数量', 'error');
                 return;
             }
-            
+
             if (item.qty < qtyNum) {
                 showToast('库存不足，当前库存：' + item.qty, 'error');
                 return;
             }
-            
-            item.qty -= qtyNum;
-            window.INV_LOGS.push({
-                type: 'out',
-                item: item.name,
-                qty: qtyNum,
-                remark: '快速出库',
-                time: Date.now()
+
+            const res = await apiRequest('/inventory/out', {
+                method: 'POST',
+                body: JSON.stringify({ itemId: id, qty: qtyNum, remark: '快速出库' })
             });
-            
-            saveData();
+            if (!res) return;
+            item.qty = res.qty;
+            window.INV_LOGS.push({ type: 'out', item: item.name, qty: qtyNum, remark: '快速出库', time: Date.now() });
             showToast(`出库成功：${item.name} -${qtyNum}`, 'success');
             renderInventory('list');
         }
@@ -2595,10 +2638,14 @@
                     }
                     
                     if (newItems.length > 0) {
-                        window.INVENTORY = [...window.INVENTORY, ...newItems];
-                        saveData();
-                        showToast(`成功导入 ${newItems.length} 条库存数据`, 'success');
-                        renderInventory('list');
+                        (async () => {
+                            for (const item of newItems) {
+                                await apiRequest('/inventory', { method: 'POST', body: JSON.stringify(item) });
+                            }
+                            window.INVENTORY = [...window.INVENTORY, ...newItems];
+                            showToast(`成功导入 ${newItems.length} 条库存数据`, 'success');
+                            renderInventory('list');
+                        })();
                     } else {
                         showToast('未找到有效数据', 'error');
                     }
@@ -2652,69 +2699,73 @@
             document.getElementById('addStaffModal').classList.add('active');
         }
         
-        function addStaff() {
+        async function addStaff() {
             const name = document.getElementById('addStaffName').value.trim();
             const dept = document.getElementById('addStaffDept').value;
             const role = document.getElementById('addStaffRole').value.trim();
-            
+
             if (!name || !role) {
                 showToast('请填写姓名和职位', 'error');
                 return;
             }
-            
+
             const newStaff = {
                 id: Date.now(),
                 name, dept, role
             };
-            
+
+            const res = await apiRequest('/users', { method: 'POST', body: JSON.stringify(newStaff) });
+            if (!res) return;
             window.USERS.push(newStaff);
-            window.PASSWORDS[newStaff.id] = '123456';
-            saveData();
             closeModal('addStaffModal');
             showToast('人员添加成功', 'success');
             renderStaff();
-            
+
             const select = document.getElementById('userSelect');
             const opt = document.createElement('option');
             opt.value = newStaff.id;
             opt.textContent = `${newStaff.name} (${newStaff.dept})`;
             select.appendChild(opt);
         }
-        
+
         function showEditStaffModal(id) {
             const user = window.USERS.find(u => u.id === id);
             if (!user) return;
-            
+
             document.getElementById('editStaffId').value = id;
             document.getElementById('editStaffName').value = user.name;
             document.getElementById('editStaffDept').value = user.dept;
             document.getElementById('editStaffRole').value = user.role;
             document.getElementById('editStaffModal').classList.add('active');
         }
-        
-        function saveEditStaff() {
+
+        async function saveEditStaff() {
             const id = parseInt(document.getElementById('editStaffId').value);
             const user = window.USERS.find(u => u.id === id);
             if (!user) return;
-            
+
             const name = document.getElementById('editStaffName').value.trim();
             const dept = document.getElementById('editStaffDept').value;
             const role = document.getElementById('editStaffRole').value.trim();
-            
+
             if (!name || !role) {
                 showToast('请填写姓名和职位', 'error');
                 return;
             }
-            
+
+            const res = await apiRequest('/users/' + id, {
+                method: 'PUT',
+                body: JSON.stringify({ name, dept, role })
+            });
+            if (!res) return;
+
             user.name = name;
             user.dept = dept;
             user.role = role;
-            
-            saveData();
             closeModal('editStaffModal');
             showToast('人员信息已保存', 'success');
             renderStaff();
-            
+
             if (currentUser && currentUser.id === id) {
                 currentUser = user;
                 document.getElementById('currentUser').textContent = currentUser.name;
@@ -2724,23 +2775,23 @@
                 document.getElementById('profileAvatar').textContent = currentUser.name.slice(-2);
             }
         }
-        
-        function deleteStaff(id) {
+
+        async function deleteStaff(id) {
             const user = window.USERS.find(u => u.id === id);
             if (!user) return;
-            
+
             if (user.id === currentUser.id) {
                 showToast('不能删除自己', 'error');
                 return;
             }
-            
+
             document.getElementById('deleteConfirmText').textContent = `确定要删除 "${user.name}" 吗？`;
-            deleteCallback = () => {
+            deleteCallback = async () => {
+                const res = await apiRequest('/users/' + id, { method: 'DELETE' });
+                if (!res) return;
                 const idx = window.USERS.findIndex(u => u.id === id);
                 if (idx !== -1) {
                     window.USERS.splice(idx, 1);
-                    delete window.PASSWORDS[id];
-                    saveData();
                     showToast('人员已删除', 'success');
                     renderStaff();
                 }
@@ -2799,10 +2850,14 @@
                     }
                     
                     if (newUsers.length > 0) {
-                        window.USERS = [...window.USERS, ...newUsers];
-                        saveData();
-                        showToast(`成功导入 ${newUsers.length} 条人员数据`, 'success');
-                        renderStaff();
+                        (async () => {
+                            for (const u of newUsers) {
+                                await apiRequest('/users', { method: 'POST', body: JSON.stringify(u) });
+                            }
+                            window.USERS = [...window.USERS, ...newUsers];
+                            showToast(`成功导入 ${newUsers.length} 条人员数据`, 'success');
+                            renderStaff();
+                        })();
                     } else {
                         showToast('未找到有效数据', 'error');
                     }
@@ -2881,31 +2936,36 @@
             document.getElementById('changePasswordModal').classList.add('active');
         }
         
-        function changePassword() {
+        async function changePassword() {
             const oldPwd = document.getElementById('oldPassword').value;
             const newPwd = document.getElementById('newPassword').value;
             const confirmPwd = document.getElementById('confirmPassword').value;
-            
-            const storedPass = window.PASSWORDS[currentUser.id] || '123456';
-            if (oldPwd !== storedPass) {
-                showToast('当前密码错误', 'error');
-                return;
-            }
-            
+
             if (!newPwd || newPwd.length < 4) {
                 showToast('新密码至少4位', 'error');
                 return;
             }
-            
             if (newPwd !== confirmPwd) {
                 showToast('两次密码不一致', 'error');
                 return;
             }
-            
-            window.PASSWORDS[currentUser.id] = newPwd;
-            saveData();
+
+            // 先验证旧密码
+            const loginCheck = await apiRequest('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ userId: currentUser.id, password: oldPwd })
+            });
+            if (!loginCheck) {
+                showToast('当前密码错误', 'error');
+                return;
+            }
+
+            // 更新密码：通过更新用户接口（后端需支持，这里先仅做前端提示，实际密码更新需后端新增接口）
+            // 最小可行方案：直接重新登录获取新token
+            authToken = loginCheck.token;
+            localStorage.setItem('buffalo_token_v7', authToken);
             closeModal('changePasswordModal');
-            showToast('密码修改成功', 'success');
+            showToast('密码修改功能需后端配合，已刷新登录状态', 'success');
         }
         
         function exportAllData() {
@@ -2933,23 +2993,33 @@
             document.getElementById('importAllFile').click();
         }
         
-        function doImportAllData(input) {
+        async function doImportAllData(input) {
             const file = input.files[0];
             if (!file) return;
-            
+
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    
-                    if (data.users) window.USERS = data.users;
-                    if (data.orders) window.ORDERS = data.orders;
-                    if (data.bom) window.BOM = data.bom;
-                    if (data.inventory) window.INVENTORY = data.inventory;
+
+                    if (data.users) {
+                        for (const u of data.users) await apiRequest('/users', { method: 'POST', body: JSON.stringify(u) });
+                        window.USERS = data.users;
+                    }
+                    if (data.orders) {
+                        for (const o of data.orders) await apiRequest('/orders', { method: 'POST', body: JSON.stringify(o) });
+                        window.ORDERS = data.orders;
+                    }
+                    if (data.bom) {
+                        for (const b of data.bom) await apiRequest('/bom', { method: 'POST', body: JSON.stringify(b) });
+                        window.BOM = data.bom;
+                    }
+                    if (data.inventory) {
+                        for (const i of data.inventory) await apiRequest('/inventory', { method: 'POST', body: JSON.stringify(i) });
+                        window.INVENTORY = data.inventory;
+                    }
                     if (data.invLogs) window.INV_LOGS = data.invLogs;
-                    if (data.passwords) window.PASSWORDS = data.passwords;
-                    
-                    saveData();
+
                     showToast('数据导入成功', 'success');
                     location.reload();
                 } catch (err) {
