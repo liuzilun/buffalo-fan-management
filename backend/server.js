@@ -35,7 +35,13 @@ app.use(helmet({
 app.use(hpp());
 
 // CORS 白名单
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const SERVER_IP = '8.130.185.30';
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  `http://${SERVER_IP}:3000`,
+  `http://${SERVER_IP}`
+];
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
