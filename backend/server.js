@@ -22,15 +22,17 @@ const SECRET = JWT_SECRET || require('crypto').randomBytes(32).toString('hex');
 app.disable('x-powered-by');
 app.use(helmet({
   contentSecurityPolicy: {
+    useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       scriptSrcAttr: ["'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", `http://${SERVER_IP}:3000`]
+      connectSrc: ["'self'"]
     }
   },
+  hsts: false,
   crossOriginEmbedderPolicy: false
 }));
 
