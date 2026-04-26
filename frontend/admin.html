@@ -153,6 +153,7 @@ const API_BASE = (() => {
     const protocol = window.location.protocol;
     if (protocol === 'file:') return `http://${SERVER_HOST}/api`;
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
+    if (host === SERVER_HOST) return `http://${SERVER_HOST}:3000/api`;
     return '/api';
 })();
 let authToken = localStorage.getItem('buffalo_admin_token') || null;

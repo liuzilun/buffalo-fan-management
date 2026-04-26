@@ -11,6 +11,7 @@ const hpp = require('hpp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SERVER_IP = '8.130.185.30';
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.warn('[SECURITY] 警告：未设置环境变量 JWT_SECRET，正在使用随机生成的临时密钥。生产环境请务必设置强密钥！');
@@ -27,7 +28,7 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       scriptSrcAttr: ["'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"]
+      connectSrc: ["'self'", `http://${SERVER_IP}:3000`]
     }
   },
   crossOriginEmbedderPolicy: false
@@ -36,7 +37,6 @@ app.use(helmet({
 app.use(hpp());
 
 // CORS 白名单
-const SERVER_IP = '8.130.185.30';
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
