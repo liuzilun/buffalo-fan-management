@@ -289,14 +289,12 @@ function initPermissionsAndRoles() {
     {code:'inventory:edit',name:'修改库存',module:'库存管理'},
     {code:'inventory:delete',name:'删除库存',module:'库存管理'},
     {code:'audit:view',name:'查看审计日志',module:'系统管理'},
-    {code:'role:manage',name:'角色权限管理',module:'系统管理'}
+    {code:'role:manage',name:'角色权限管理',module:'系统管理'},
+    {code:'report:view',name:'查看统计报表',module:'统计分析'}
   ];
-  db.get("SELECT COUNT(*) as count FROM permissions", (err, row) => {
-    if (err || row.count > 0) return;
-    const stmt = db.prepare("INSERT INTO permissions (code, name, module, description) VALUES (?, ?, ?, ?)");
-    perms.forEach(p => stmt.run(p.code, p.name, p.module, p.name));
-    stmt.finalize();
-  });
+  const permStmt = db.prepare("INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES (?, ?, ?, ?)");
+  perms.forEach(p => permStmt.run(p.code, p.name, p.module, p.name));
+  permStmt.finalize();
 
   db.get("SELECT COUNT(*) as count FROM roles", (err, row) => {
     if (err || row.count > 0) return;
@@ -419,11 +417,21 @@ app.delete('/api/users/:id', authMiddleware, checkPermission('user:delete'), (re
 });
 
 // ============ 订单 API ============
+function normalizeProcesses(procs) {
+  if (!Array.isArray(procs)) {
+    return Array(8).fill(null).map(() => ({ done: false, operator: '', time: '', remark: '', abnormal: '' }));
+  }
+  if (procs.length > 0 && typeof procs[0] === 'boolean') {
+    return procs.map(done => ({ done, operator: done ? '系统迁移' : '', time: done ? new Date().toISOString() : '', remark: '', abnormal: '' }));
+  }
+  return procs;
+}
+
 app.get('/api/orders', authMiddleware, checkPermission('order:view'), (req, res) => {
   db.all("SELECT * FROM orders", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     rows.forEach(r => {
-      try { r.processes = JSON.parse(r.processes); } catch(e) { r.processes = Array(8).fill(false); }
+      try { r.processes = normalizeProcesses(JSON.parse(r.processes)); } catch(e) { r.processes = normalizeProcesses(null); }
       try { r.qc = JSON.parse(r.qc); } catch(e) { r.qc = Array(6).fill(false); }
     });
     res.json(rows);
@@ -436,7 +444,8 @@ app.post('/api/orders', authMiddleware, checkPermission('order:create'), (req, r
   const safeId = sanitize(id);
   const safeCustomer = sanitize(customer);
   const safeModel = sanitize(model);
-  const procs = JSON.stringify(processes || Array(8).fill(false));
+  const defaultProcs = Array(8).fill(null).map(() => ({ done: false, operator: '', time: '', remark: '', abnormal: '' }));
+  const procs = JSON.stringify(processes || defaultProcs);
   const qcs = JSON.stringify(qc || Array(6).fill(false));
   db.run("INSERT INTO orders (id, customer, model, qty, delivery, status, processes, qc, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [safeId, safeCustomer, safeModel, qty || 1, delivery, status || 'pending', procs, qcs, created || new Date().toISOString()],
@@ -467,6 +476,65 @@ app.delete('/api/orders/:id', authMiddleware, checkPermission('order:delete'), (
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除订单', 'order', 'ID=' + req.params.id);
     res.json({ deleted: this.changes });
+  });
+});
+
+// ============ 统计报表 API ============
+app.get('/api/reports', authMiddleware, checkPermission('report:view'), (req, res) => {
+  const report = { orders: {}, production: {}, inventory: {}, staff: [] };
+
+  // 订单统计
+  db.all("SELECT status, COUNT(*) as count FROM orders GROUP BY status", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const byStatus = {};
+    let total = 0;
+    rows.forEach(r => { byStatus[r.status] = r.count; total += r.count; });
+    report.orders.total = total;
+    report.orders.byStatus = byStatus;
+
+    db.all("SELECT strftime('%Y-%m', created) as month, COUNT(*) as count FROM orders GROUP BY month ORDER BY month", [], (err, rows2) => {
+      if (err) return res.status(500).json({ error: err.message });
+      report.orders.monthly = rows2;
+
+      // 库存统计
+      db.all("SELECT status, COUNT(*) as count FROM inventory GROUP BY status", [], (err, rows3) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const invStats = {};
+        rows3.forEach(r => { invStats[r.status] = r.count; });
+        report.inventory = invStats;
+
+        // 生产工序统计（从订单 processes 字段解析）
+        db.all("SELECT processes FROM orders", [], (err, rows4) => {
+          if (err) return res.status(500).json({ error: err.message });
+          const processStats = Array(8).fill(0);
+          const staffMap = {};
+          rows4.forEach(r => {
+            try {
+              const procs = normalizeProcesses(JSON.parse(r.processes));
+              procs.forEach((p, idx) => {
+                if (p.done) processStats[idx]++;
+                if (p.done && p.operator) {
+                  staffMap[p.operator] = (staffMap[p.operator] || 0) + 1;
+                }
+              });
+            } catch(e) {}
+          });
+          report.production.processCompletion = processStats.map((count, idx) => ({
+            name: ['机壳拼焊','底座拼焊','机壳底座焊接','叶轮拼焊','叶轮焊接','喷砂油漆','风机组装','测试出厂'][idx],
+            completed: count,
+            total: rows4.length
+          }));
+
+          // 人员工作量排序
+          report.staff = Object.entries(staffMap)
+            .map(([name, count]) => ({ name, processCount: count }))
+            .sort((a, b) => b.processCount - a.processCount)
+            .slice(0, 20);
+
+          res.json(report);
+        });
+      });
+    });
   });
 });
 

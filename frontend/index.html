@@ -1075,6 +1075,14 @@
                     <div id="messagesList"></div>
                 </div>
                 
+                <!-- 统计报表 -->
+                <div class="page" id="page-report">
+                    <div class="section-title">📊 统计报表</div>
+                    <div id="reportContent" style="padding:10px;">
+                        <div style="text-align:center;color:var(--gray);padding:40px;">加载中...</div>
+                    </div>
+                </div>
+                
                 <!-- 我的 -->
                 <div class="page" id="page-profile">
                     <div class="profile-card">
@@ -1086,6 +1094,11 @@
                         <div class="menu-item" onclick="showTab('staff')">
                             <span class="menu-icon">👥</span>
                             <span class="menu-text">人员管理</span>
+                            <span class="menu-arrow">›</span>
+                        </div>
+                        <div class="menu-item" onclick="showReportPage()" id="reportMenuItem" style="display:none;">
+                            <span class="menu-icon">📊</span>
+                            <span class="menu-text">统计报表</span>
                             <span class="menu-arrow">›</span>
                         </div>
                         <div class="menu-item" onclick="showChangePasswordModal()">
@@ -1484,18 +1497,18 @@
         // 订单数据
         const today = new Date();
         const ORDERS_DATA = [
-            {id:'BF0426N546A', customer:'玖龙纸业', model:'BL61-S4900', qty:2, delivery:new Date(today.getTime()+30*86400000).toISOString().split('T')[0], status:'production', processes:[true,true,true,true,true,false,false,false], qc:[true,true,false,false,false,false], created:new Date().toISOString()},
-            {id:'BF0426N545A', customer:'山东金锣', model:'BL60-S3200', qty:1, delivery:new Date(today.getTime()+25*86400000).toISOString().split('T')[0], status:'production', processes:[true,true,true,false,false,false,false,false], qc:[true,false,false,false,false,false], created:new Date().toISOString()},
-            {id:'BF0326N539A', customer:'宁波亚洲', model:'BL61-S3300', qty:2, delivery:new Date(today.getTime()-12*86400000).toISOString().split('T')[0], status:'overdue', processes:[true,true,true,true,true,true,false,false], qc:[true,true,true,false,false,false], created:new Date().toISOString()},
-            {id:'BF0326N538A', customer:'武汉裕大', model:'BL50-S2100', qty:1, delivery:new Date(today.getTime()+45*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
-            {id:'BF0326N537A', customer:'苏州恒力', model:'BL61-S4500', qty:3, delivery:new Date(today.getTime()+60*86400000).toISOString().split('T')[0], status:'qc', processes:[true,true,true,true,true,true,true,true], qc:[true,true,true,true,true,false], created:new Date().toISOString()},
-            {id:'BF0226N536A', customer:'南通恒科', model:'BL61-S4900', qty:2, delivery:new Date(today.getTime()-38*86400000).toISOString().split('T')[0], status:'overdue', processes:[true,true,true,true,true,true,false,false], qc:[true,true,true,false,false,false], created:new Date().toISOString()},
-            {id:'BF0226N535A', customer:'江西晨鸣', model:'BL60-S2800', qty:1, delivery:new Date(today.getTime()+90*86400000).toISOString().split('T')[0], status:'completed', processes:[true,true,true,true,true,true,true,true], qc:[true,true,true,true,true,true], created:new Date().toISOString()},
-            {id:'BF0126N532A', customer:'天津锦祥', model:'BL50-S1800', qty:2, delivery:new Date(today.getTime()+120*86400000).toISOString().split('T')[0], status:'completed', processes:[true,true,true,true,true,true,true,true], qc:[true,true,true,true,true,true], created:new Date().toISOString()},
-            {id:'BF1225N530A', customer:'江苏博汇', model:'BL61-S5200', qty:1, delivery:new Date(today.getTime()+15*86400000).toISOString().split('T')[0], status:'production', processes:[true,true,true,true,false,false,false,false], qc:[true,false,false,false,false,false], created:new Date().toISOString()},
-            {id:'BF1225N529A', customer:'重庆理文', model:'BL60-S3500', qty:2, delivery:new Date(today.getTime()+35*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
-            {id:'BF1125N525A', customer:'河北华泰', model:'BL61-S4800', qty:1, delivery:new Date(today.getTime()+50*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
-            {id:'BF1125N524A', customer:'福建联盛', model:'BL50-S2000', qty:3, delivery:new Date(today.getTime()+75*86400000).toISOString().split('T')[0], status:'pending', processes:[false,false,false,false,false,false,false,false], qc:[false,false,false,false,false,false], created:new Date().toISOString()}
+            {id:'BF0426N546A', customer:'玖龙纸业', model:'BL61-S4900', qty:2, delivery:new Date(today.getTime()+30*86400000).toISOString().split('T')[0], status:'production', processes:[{done:true,operator:'张工',time:'2026-04-20T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2026-04-20T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2026-04-21T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'刘工',time:'2026-04-22T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'陈工',time:'2026-04-23T14:00:00Z',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[true,true,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF0426N545A', customer:'山东金锣', model:'BL60-S3200', qty:1, delivery:new Date(today.getTime()+25*86400000).toISOString().split('T')[0], status:'production', processes:[{done:true,operator:'张工',time:'2026-04-18T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2026-04-18T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2026-04-19T09:00:00Z',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[true,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF0326N539A', customer:'宁波亚洲', model:'BL61-S3300', qty:2, delivery:new Date(today.getTime()-12*86400000).toISOString().split('T')[0], status:'overdue', processes:[{done:true,operator:'张工',time:'2026-03-10T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2026-03-10T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2026-03-11T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'刘工',time:'2026-03-12T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'陈工',time:'2026-03-13T14:00:00Z',remark:'',abnormal:''},{done:true,operator:'杨工',time:'2026-03-14T09:00:00Z',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[true,true,true,false,false,false], created:new Date().toISOString()},
+            {id:'BF0326N538A', customer:'武汉裕大', model:'BL50-S2100', qty:1, delivery:new Date(today.getTime()+45*86400000).toISOString().split('T')[0], status:'pending', processes:[{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF0326N537A', customer:'苏州恒力', model:'BL61-S4500', qty:3, delivery:new Date(today.getTime()+60*86400000).toISOString().split('T')[0], status:'qc', processes:[{done:true,operator:'张工',time:'2026-03-01T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2026-03-01T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2026-03-02T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'刘工',time:'2026-03-03T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'陈工',time:'2026-03-04T14:00:00Z',remark:'',abnormal:''},{done:true,operator:'杨工',time:'2026-03-05T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'赵工',time:'2026-03-06T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'周工',time:'2026-03-07T11:00:00Z',remark:'',abnormal:''}], qc:[true,true,true,true,true,false], created:new Date().toISOString()},
+            {id:'BF0226N536A', customer:'南通恒科', model:'BL61-S4900', qty:2, delivery:new Date(today.getTime()-38*86400000).toISOString().split('T')[0], status:'overdue', processes:[{done:true,operator:'张工',time:'2026-02-10T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2026-02-10T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2026-02-11T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'刘工',time:'2026-02-12T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'陈工',time:'2026-02-13T14:00:00Z',remark:'',abnormal:''},{done:true,operator:'杨工',time:'2026-02-14T09:00:00Z',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[true,true,true,false,false,false], created:new Date().toISOString()},
+            {id:'BF0226N535A', customer:'江西晨鸣', model:'BL60-S2800', qty:1, delivery:new Date(today.getTime()+90*86400000).toISOString().split('T')[0], status:'completed', processes:[{done:true,operator:'张工',time:'2026-02-01T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2026-02-01T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2026-02-02T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'刘工',time:'2026-02-03T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'陈工',time:'2026-02-04T14:00:00Z',remark:'',abnormal:''},{done:true,operator:'杨工',time:'2026-02-05T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'赵工',time:'2026-02-06T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'周工',time:'2026-02-07T11:00:00Z',remark:'',abnormal:''}], qc:[true,true,true,true,true,true], created:new Date().toISOString()},
+            {id:'BF0126N532A', customer:'天津锦祥', model:'BL50-S1800', qty:2, delivery:new Date(today.getTime()+120*86400000).toISOString().split('T')[0], status:'completed', processes:[{done:true,operator:'张工',time:'2026-01-10T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2026-01-10T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2026-01-11T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'刘工',time:'2026-01-12T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'陈工',time:'2026-01-13T14:00:00Z',remark:'',abnormal:''},{done:true,operator:'杨工',time:'2026-01-14T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'赵工',time:'2026-01-15T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'周工',time:'2026-01-16T11:00:00Z',remark:'',abnormal:''}], qc:[true,true,true,true,true,true], created:new Date().toISOString()},
+            {id:'BF1225N530A', customer:'江苏博汇', model:'BL61-S5200', qty:1, delivery:new Date(today.getTime()+15*86400000).toISOString().split('T')[0], status:'production', processes:[{done:true,operator:'张工',time:'2025-12-20T08:00:00Z',remark:'',abnormal:''},{done:true,operator:'李工',time:'2025-12-20T10:00:00Z',remark:'',abnormal:''},{done:true,operator:'王工',time:'2025-12-21T09:00:00Z',remark:'',abnormal:''},{done:true,operator:'刘工',time:'2025-12-22T08:00:00Z',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[true,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF1225N529A', customer:'重庆理文', model:'BL60-S3500', qty:2, delivery:new Date(today.getTime()+35*86400000).toISOString().split('T')[0], status:'pending', processes:[{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF1125N525A', customer:'河北华泰', model:'BL61-S4800', qty:1, delivery:new Date(today.getTime()+50*86400000).toISOString().split('T')[0], status:'pending', processes:[{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[false,false,false,false,false,false], created:new Date().toISOString()},
+            {id:'BF1125N524A', customer:'福建联盛', model:'BL50-S2000', qty:3, delivery:new Date(today.getTime()+75*86400000).toISOString().split('T')[0], status:'pending', processes:[{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''},{done:false,operator:'',time:'',remark:'',abnormal:''}], qc:[false,false,false,false,false,false], created:new Date().toISOString()}
         ];
         
         // ============ 全局变量 ============
@@ -1582,6 +1595,7 @@
             localStorage.setItem('buffalo_token_v7', authToken);
             currentUser = res.user;
             localStorage.setItem('buffalo_current_user_v7', JSON.stringify({id: currentUser.id, name: currentUser.name}));
+            await loadData();
             showMainApp();
         }
 
@@ -1592,7 +1606,7 @@
             location.reload();
         }
         
-        function showMainApp() {
+        async function showMainApp() {
             document.getElementById('loginPage').style.display = 'none';
             document.getElementById('mainApp').classList.add('active');
             document.getElementById('currentUser').textContent = currentUser.name;
@@ -1617,10 +1631,120 @@
                 addStaffBtn.style.display = 'none';
             }
             
+            // 获取权限并控制报表菜单显示
+            const perms = await apiRequest('/my-permissions') || [];
+            currentUser.permissions = perms;
+            const reportMenu = document.getElementById('reportMenuItem');
+            if (reportMenu) {
+                reportMenu.style.display = perms.includes('report:view') ? 'flex' : 'none';
+            }
+            
             renderHome();
             renderMessages();
         }
         
+        // ============ 统计报表 ============
+        async function showReportPage() {
+            showTab('report');
+            await loadReport();
+        }
+
+        async function loadReport() {
+            const container = document.getElementById('reportContent');
+            container.innerHTML = '<div style="text-align:center;color:var(--gray);padding:40px;">加载中...</div>';
+            const data = await apiRequest('/reports');
+            if (!data) {
+                container.innerHTML = '<div style="text-align:center;color:var(--danger);padding:40px;">加载失败</div>';
+                return;
+            }
+            renderReport(data);
+        }
+
+        function renderReport(data) {
+            const orders = data.orders || {};
+            const production = data.production || {};
+            const inventory = data.inventory || {};
+            const staff = data.staff || [];
+
+            let html = '<div class="report-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">';
+
+            // 订单概览
+            html += `<div class="report-card" style="background:#fff;border-radius:12px;padding:15px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                <h3 style="margin:0 0 10px;font-size:16px;">📋 订单概览</h3>
+                <div style="font-size:28px;font-weight:700;color:var(--primary);">${orders.total || 0}</div>
+                <div style="font-size:12px;color:var(--gray);">订单总数</div>
+                <div style="margin-top:10px;font-size:12px;">`;
+            const statusMap = {pending:'待生产',production:'生产中',qc:'质检中',completed:'已完成',overdue:'已逾期'};
+            const statusColor = {pending:'#f39c12',production:'#3498db',qc:'#9b59b6',completed:'#27ae60',overdue:'#e74c3c'};
+            for (const [k, v] of Object.entries(orders.byStatus || {})) {
+                html += `<span style="display:inline-block;margin:2px;padding:3px 8px;border-radius:4px;background:${statusColor[k] || '#ddd'}22;color:${statusColor[k] || '#666'};font-size:11px;">${statusMap[k] || k}: ${v}</span>`;
+            }
+            html += `</div></div>`;
+
+            // 库存概览
+            html += `<div class="report-card" style="background:#fff;border-radius:12px;padding:15px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                <h3 style="margin:0 0 10px;font-size:16px;">🏭 库存概览</h3>
+                <div style="font-size:28px;font-weight:700;color:var(--primary);">${(inventory.enough || 0) + (inventory.low || 0) + (inventory.out || 0)}</div>
+                <div style="font-size:12px;color:var(--gray);">物料种类</div>
+                <div style="margin-top:10px;font-size:12px;">
+                    <span style="display:inline-block;margin:2px;padding:3px 8px;border-radius:4px;background:#27ae6022;color:#27ae60;">充足: ${inventory.enough || 0}</span>
+                    <span style="display:inline-block;margin:2px;padding:3px 8px;border-radius:4px;background:#f39c1222;color:#f39c12;">低库存: ${inventory.low || 0}</span>
+                    <span style="display:inline-block;margin:2px;padding:3px 8px;border-radius:4px;background:#e74c3c22;color:#e74c3c;">缺货: ${inventory.out || 0}</span>
+                </div>
+            </div>`;
+
+            // 工序完成率
+            const procs = production.processCompletion || [];
+            html += `<div class="report-card" style="background:#fff;border-radius:12px;padding:15px;box-shadow:0 2px 8px rgba(0,0,0,0.05);grid-column:1 / -1;">
+                <h3 style="margin:0 0 10px;font-size:16px;">⚙️ 工序完成率</h3>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;">`;
+            procs.forEach(p => {
+                const pct = p.total > 0 ? Math.round(p.completed / p.total * 100) : 0;
+                html += `<div style="flex:1;min-width:120px;">
+                    <div style="font-size:12px;color:var(--gray);margin-bottom:4px;">${p.name}</div>
+                    <div style="height:8px;background:#eee;border-radius:4px;overflow:hidden;">
+                        <div style="height:100%;width:${pct}%;background:var(--primary);border-radius:4px;"></div>
+                    </div>
+                    <div style="font-size:11px;margin-top:2px;">${p.completed}/${p.total} (${pct}%)</div>
+                </div>`;
+            });
+            html += `</div></div>`;
+
+            // 人员工作量 TOP10
+            html += `<div class="report-card" style="background:#fff;border-radius:12px;padding:15px;box-shadow:0 2px 8px rgba(0,0,0,0.05);grid-column:1 / -1;">
+                <h3 style="margin:0 0 10px;font-size:16px;">👷 人员工作量 TOP10</h3>
+                <div style="display:flex;flex-direction:column;gap:8px;">`;
+            staff.slice(0, 10).forEach((s, i) => {
+                html += `<div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:24px;height:24px;border-radius:50%;background:${i < 3 ? 'var(--primary)' : '#ddd'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;">${i + 1}</div>
+                    <div style="flex:1;font-size:14px;">${s.name}</div>
+                    <div style="font-size:14px;font-weight:600;color:var(--primary);">${s.processCount} 工序</div>
+                </div>`;
+            });
+            html += `</div></div>`;
+
+            // 月度订单趋势
+            const monthly = orders.monthly || [];
+            if (monthly.length > 0) {
+                html += `<div class="report-card" style="background:#fff;border-radius:12px;padding:15px;box-shadow:0 2px 8px rgba(0,0,0,0.05);grid-column:1 / -1;">
+                    <h3 style="margin:0 0 10px;font-size:16px;">📈 月度订单趋势</h3>
+                    <div style="display:flex;align-items:flex-end;gap:8px;height:120px;padding-top:20px;">`;
+                const maxCount = Math.max(...monthly.map(m => m.count), 1);
+                monthly.forEach(m => {
+                    const h = Math.round(m.count / maxCount * 100);
+                    html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                        <div style="font-size:11px;color:var(--gray);">${m.count}</div>
+                        <div style="width:100%;height:${h}px;background:var(--primary);border-radius:4px 4px 0 0;min-height:4px;"></div>
+                        <div style="font-size:11px;color:var(--gray);white-space:nowrap;">${m.month}</div>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            html += '</div>';
+            document.getElementById('reportContent').innerHTML = html;
+        }
+
         // ============ 页面导航 ============
         function showTab(tab, navBtn) {
             currentPage = tab;
@@ -1684,7 +1808,7 @@
         }
         
         function createOrderCard(order) {
-            const completedSteps = order.processes.filter(p => p).length;
+            const completedSteps = order.processes.filter(p => p.done).length;
             const progress = (completedSteps / 8 * 100).toFixed(0);
             const statusText = {pending:'待生产',production:'生产中',qc:'质检中',completed:'已完成',overdue:'已逾期'};
             const statusClass = order.status;
@@ -1781,8 +1905,9 @@
             let processHtml = '<h4 style="margin-bottom:15px;">⚙️ 工序进度</h4><div class="process-timeline">';
             
             PROCESSES.forEach((p, idx) => {
-                const completed = order.processes[idx];
-                let className = completed ? 'completed' : (idx === order.processes.findIndex((v,i) => !v && i <= idx) ? 'current' : '');
+                const proc = order.processes[idx] || { done: false, operator: '', time: '', remark: '', abnormal: '' };
+                const completed = proc.done;
+                let className = completed ? 'completed' : (idx === order.processes.findIndex((v,i) => !v.done && i <= idx) ? 'current' : '');
                 let clickHandler = canEditProcess ? `onclick="toggleProcess(${idx})"` : '';
                 
                 processHtml += `
@@ -1791,7 +1916,11 @@
                         <div class="timeline-content ${className}" ${clickHandler}>
                             <div class="timeline-title">${p.icon} ${p.name}</div>
                             <div class="timeline-meta">负责部门: ${p.dept}</div>
-                            ${completed ? `<div class="timeline-operator">✓ 已完成</div>` : `<div class="timeline-operator">点击标记完成</div>`}
+                            ${completed ? `
+                                <div class="timeline-operator">✓ 已完成 | 操作人: ${proc.operator || '未记录'} | ${proc.time ? new Date(proc.time).toLocaleString('zh-CN') : ''}</div>
+                                ${proc.remark ? `<div class="timeline-remark" style="color:#3498db;font-size:12px;">备注: ${proc.remark}</div>` : ''}
+                                ${proc.abnormal ? `<div class="timeline-abnormal" style="color:#e74c3c;font-size:12px;">异常: ${proc.abnormal}</div>` : ''}
+                            ` : `<div class="timeline-operator">点击标记完成</div>`}
                         </div>
                     </div>
                 `;
@@ -1804,7 +1933,8 @@
                 <h4 style="margin-bottom:15px;">📊 甘特图</h4>
                 <div class="gantt-container">
                     ${PROCESSES.map((p, idx) => {
-                        const completed = order.processes[idx];
+                        const proc = order.processes[idx] || { done: false };
+                        const completed = proc.done;
                         return `
                             <div class="gantt-row">
                                 <div class="gantt-label">${p.name}</div>
@@ -1843,10 +1973,30 @@
         
         async function toggleProcess(idx) {
             if (!currentOrder) return;
-            currentOrder.processes[idx] = !currentOrder.processes[idx];
+            const proc = currentOrder.processes[idx];
+            const pInfo = PROCESSES[idx];
 
-            const allCompleted = currentOrder.processes.every(p => p);
-            const anyInProgress = currentOrder.processes.some(p => p);
+            if (!proc.done) {
+                const operator = prompt(`【${pInfo.name}】操作人：`, currentUser.name) || currentUser.name;
+                const remark = prompt(`【${pInfo.name}】备注：`) || '';
+                const abnormal = prompt(`【${pInfo.name}】异常记录：`) || '';
+                if (!confirm(`确认标记【${pInfo.name}】为已完成？\n操作人：${operator}\n备注：${remark || '无'}\n异常：${abnormal || '无'}`)) return;
+                proc.done = true;
+                proc.operator = operator;
+                proc.time = new Date().toISOString();
+                proc.remark = remark;
+                proc.abnormal = abnormal;
+            } else {
+                if (!confirm(`确定要撤销【${pInfo.name}】的完成状态吗？`)) return;
+                proc.done = false;
+                proc.operator = '';
+                proc.time = '';
+                proc.remark = '';
+                proc.abnormal = '';
+            }
+
+            const allCompleted = currentOrder.processes.every(p => p.done);
+            const anyInProgress = currentOrder.processes.some(p => p.done);
             const qcDone = currentOrder.qc.every(q => q);
 
             if (allCompleted && qcDone) {
@@ -1879,8 +2029,23 @@
         }
         
         // ============ 订单管理 ============
+        function generateOrderId() {
+            const now = new Date();
+            const yy = String(now.getFullYear()).slice(-2);
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const prefix = `BF${mm}${yy}`;
+            const todayStr = now.toISOString().split('T')[0];
+            const todayOrders = (window.ORDERS || []).filter(o => {
+                if (!o.created) return false;
+                const orderDate = o.created.split('T')[0];
+                return orderDate === todayStr && o.id.startsWith(prefix);
+            });
+            const seq = String(todayOrders.length + 1).padStart(3, '0');
+            return `${prefix}N${seq}A`;
+        }
+
         function showAddOrderModal() {
-            document.getElementById('addOrderId').value = '';
+            document.getElementById('addOrderId').value = generateOrderId();
             document.getElementById('addOrderCustomer').value = '';
             document.getElementById('addOrderModel').value = '';
             document.getElementById('addOrderQty').value = '1';
@@ -1908,7 +2073,7 @@
             const newOrder = {
                 id, customer, model, qty, delivery,
                 status: 'pending',
-                processes: Array(8).fill(false),
+                processes: Array(8).fill(null).map(() => ({ done: false, operator: '', time: '', remark: '', abnormal: '' })),
                 qc: Array(6).fill(false),
                 created: new Date().toISOString()
             };
@@ -1945,7 +2110,7 @@
 
             // 完工状态保护逻辑
             if (newStatus === 'completed' && order.status !== 'completed') {
-                const allProcessesDone = order.processes.every(p => p);
+                const allProcessesDone = order.processes.every(p => p.done);
                 const allQCDone = order.qc.every(q => q);
                 if (!allProcessesDone) {
                     showToast('所有工序未完成，不能设为完工状态', 'error');
