@@ -388,7 +388,7 @@ app.post('/api/inventory/out', authMiddleware, (req, res) => {
 });
 
 // ============ 静态文件 & 启动 ============
-const publicPath = path.join(__dirname, '..');
+const publicPath = path.join(__dirname, '..', 'frontend');
 app.use(express.static(publicPath));
 
 app.listen(PORT, () => {
