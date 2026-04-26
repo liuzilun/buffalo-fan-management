@@ -152,6 +152,33 @@ db.serialize(() => {
     ip TEXT,
     time INTEGER
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    created INTEGER
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    module TEXT,
+    description TEXT
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id INTEGER,
+    permission_id INTEGER,
+    PRIMARY KEY (role_id, permission_id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_roles (
+    user_id INTEGER,
+    role_id INTEGER,
+    PRIMARY KEY (user_id, role_id)
+  )`);
 });
 
 // ============ 初始化演示数据 ============
@@ -238,6 +265,49 @@ function initDemoData() {
 
 initDemoData();
 
+function initPermissionsAndRoles() {
+  const perms = [
+    {code:'user:view',name:'查看人员',module:'人员管理'},
+    {code:'user:create',name:'添加人员',module:'人员管理'},
+    {code:'user:edit',name:'修改人员',module:'人员管理'},
+    {code:'user:delete',name:'删除人员',module:'人员管理'},
+    {code:'order:view',name:'查看订单',module:'订单管理'},
+    {code:'order:create',name:'创建订单',module:'订单管理'},
+    {code:'order:edit',name:'修改订单',module:'订单管理'},
+    {code:'order:delete',name:'删除订单',module:'订单管理'},
+    {code:'bom:view',name:'查看BOM',module:'BOM管理'},
+    {code:'bom:create',name:'添加BOM',module:'BOM管理'},
+    {code:'bom:edit',name:'修改BOM',module:'BOM管理'},
+    {code:'bom:delete',name:'删除BOM',module:'BOM管理'},
+    {code:'inventory:view',name:'查看库存',module:'库存管理'},
+    {code:'inventory:in',name:'入库操作',module:'库存管理'},
+    {code:'inventory:out',name:'出库操作',module:'库存管理'},
+    {code:'inventory:edit',name:'修改库存',module:'库存管理'},
+    {code:'inventory:delete',name:'删除库存',module:'库存管理'},
+    {code:'audit:view',name:'查看审计日志',module:'系统管理'},
+    {code:'role:manage',name:'角色权限管理',module:'系统管理'}
+  ];
+  db.get("SELECT COUNT(*) as count FROM permissions", (err, row) => {
+    if (err || row.count > 0) return;
+    const stmt = db.prepare("INSERT INTO permissions (code, name, module, description) VALUES (?, ?, ?, ?)");
+    perms.forEach(p => stmt.run(p.code, p.name, p.module, p.name));
+    stmt.finalize();
+  });
+
+  db.get("SELECT COUNT(*) as count FROM roles", (err, row) => {
+    if (err || row.count > 0) return;
+    const roles = [
+      {name:'系统管理员',desc:'全部权限'},
+      {name:'部门经理',desc:'管理部门数据'},
+      {name:'普通员工',desc:'查看和创建'}
+    ];
+    const stmt = db.prepare("INSERT INTO roles (name, description, created) VALUES (?, ?, ?)");
+    roles.forEach(r => stmt.run(r.name, r.desc, Date.now()));
+    stmt.finalize();
+  });
+}
+initPermissionsAndRoles();
+
 // ============ 工具函数 ============
 function sanitize(str) {
   if (typeof str !== 'string') return str;
@@ -261,6 +331,16 @@ function authMiddleware(req, res, next) {
     req.user = user;
     next();
   });
+}
+
+function checkPermission(permissionCode) {
+  return (req, res, next) => {
+    if (req.user.role === '总经理') return next();
+    db.get(`SELECT 1 FROM user_roles ur JOIN role_permissions rp ON ur.role_id = rp.role_id JOIN permissions p ON rp.permission_id = p.id WHERE ur.user_id = ? AND p.code = ? LIMIT 1`, [req.user.id, permissionCode], (err, row) => {
+      if (err || !row) return res.status(403).json({ error: '无权限执行此操作' });
+      next();
+    });
+  };
 }
 
 // ============ 认证 API ============
@@ -291,14 +371,14 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 });
 
 // ============ 用户 API ============
-app.get('/api/users', authMiddleware, (req, res) => {
+app.get('/api/users', authMiddleware, checkPermission('user:view'), (req, res) => {
   db.all("SELECT id, name, dept, role FROM users", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
 
-app.post('/api/users', authMiddleware, (req, res) => {
+app.post('/api/users', authMiddleware, checkPermission('user:create'), (req, res) => {
   const { id, name, dept, role, password } = req.body;
   if (!name || !dept || !role) return res.status(400).json({ error: '缺少必填字段' });
   const safeName = sanitize(name);
@@ -313,7 +393,7 @@ app.post('/api/users', authMiddleware, (req, res) => {
   });
 });
 
-app.put('/api/users/:id', authMiddleware, (req, res) => {
+app.put('/api/users/:id', authMiddleware, checkPermission('user:edit'), (req, res) => {
   const { name, dept, role } = req.body;
   if (!name || !dept || !role) return res.status(400).json({ error: '缺少必填字段' });
   const safeName = sanitize(name);
@@ -326,7 +406,7 @@ app.put('/api/users/:id', authMiddleware, (req, res) => {
   });
 });
 
-app.delete('/api/users/:id', authMiddleware, (req, res) => {
+app.delete('/api/users/:id', authMiddleware, checkPermission('user:delete'), (req, res) => {
   db.run("DELETE FROM users WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除人员', 'user', 'ID=' + req.params.id);
@@ -335,7 +415,7 @@ app.delete('/api/users/:id', authMiddleware, (req, res) => {
 });
 
 // ============ 订单 API ============
-app.get('/api/orders', authMiddleware, (req, res) => {
+app.get('/api/orders', authMiddleware, checkPermission('order:view'), (req, res) => {
   db.all("SELECT * FROM orders", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     rows.forEach(r => {
@@ -346,7 +426,7 @@ app.get('/api/orders', authMiddleware, (req, res) => {
   });
 });
 
-app.post('/api/orders', authMiddleware, (req, res) => {
+app.post('/api/orders', authMiddleware, checkPermission('order:create'), (req, res) => {
   const { id, customer, model, qty, delivery, status, processes, qc, created } = req.body;
   if (!id || !customer || !model) return res.status(400).json({ error: '缺少必填字段' });
   const safeId = sanitize(id);
@@ -363,7 +443,7 @@ app.post('/api/orders', authMiddleware, (req, res) => {
     });
 });
 
-app.put('/api/orders/:id', authMiddleware, (req, res) => {
+app.put('/api/orders/:id', authMiddleware, checkPermission('order:edit'), (req, res) => {
   const { customer, model, qty, delivery, status, processes, qc } = req.body;
   const safeCustomer = customer ? sanitize(customer) : undefined;
   const safeModel = model ? sanitize(model) : undefined;
@@ -378,7 +458,7 @@ app.put('/api/orders/:id', authMiddleware, (req, res) => {
     });
 });
 
-app.delete('/api/orders/:id', authMiddleware, (req, res) => {
+app.delete('/api/orders/:id', authMiddleware, checkPermission('order:delete'), (req, res) => {
   db.run("DELETE FROM orders WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除订单', 'order', 'ID=' + req.params.id);
@@ -387,7 +467,7 @@ app.delete('/api/orders/:id', authMiddleware, (req, res) => {
 });
 
 // ============ BOM API ============
-app.get('/api/bom', authMiddleware, (req, res) => {
+app.get('/api/bom', authMiddleware, checkPermission('bom:view'), (req, res) => {
   db.all("SELECT * FROM bom", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     rows.forEach(r => {
@@ -397,7 +477,7 @@ app.get('/api/bom', authMiddleware, (req, res) => {
   });
 });
 
-app.post('/api/bom', authMiddleware, (req, res) => {
+app.post('/api/bom', authMiddleware, checkPermission('bom:create'), (req, res) => {
   const { id, code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, changes } = req.body;
   if (!id || !name) return res.status(400).json({ error: '缺少必填字段' });
   const safeName = sanitize(name);
@@ -410,7 +490,7 @@ app.post('/api/bom', authMiddleware, (req, res) => {
     });
 });
 
-app.put('/api/bom/:id', authMiddleware, (req, res) => {
+app.put('/api/bom/:id', authMiddleware, checkPermission('bom:edit'), (req, res) => {
   const { code, model, name, qty, material, unitWeight, totalWeight, unit, manufacturer, remark, status, changes } = req.body;
   const safeName = name ? sanitize(name) : undefined;
   const chg = changes ? JSON.stringify(changes) : undefined;
@@ -423,7 +503,7 @@ app.put('/api/bom/:id', authMiddleware, (req, res) => {
     });
 });
 
-app.delete('/api/bom/:id', authMiddleware, (req, res) => {
+app.delete('/api/bom/:id', authMiddleware, checkPermission('bom:delete'), (req, res) => {
   db.run("DELETE FROM bom WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除BOM', 'bom', 'ID=' + req.params.id);
@@ -432,7 +512,7 @@ app.delete('/api/bom/:id', authMiddleware, (req, res) => {
 });
 
 // ============ 库存 API ============
-app.get('/api/inventory', authMiddleware, (req, res) => {
+app.get('/api/inventory', authMiddleware, checkPermission('inventory:view'), (req, res) => {
   db.all("SELECT * FROM inventory", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     rows.forEach(r => {
@@ -442,7 +522,7 @@ app.get('/api/inventory', authMiddleware, (req, res) => {
   });
 });
 
-app.post('/api/inventory', authMiddleware, (req, res) => {
+app.post('/api/inventory', authMiddleware, checkPermission('inventory:edit'), (req, res) => {
   const { id, name, spec, category, material, qty, min, max, unit, price, location, remark, status, changes } = req.body;
   if (!id || !name) return res.status(400).json({ error: '缺少必填字段' });
   const safeName = sanitize(name);
@@ -455,7 +535,7 @@ app.post('/api/inventory', authMiddleware, (req, res) => {
     });
 });
 
-app.put('/api/inventory/:id', authMiddleware, (req, res) => {
+app.put('/api/inventory/:id', authMiddleware, checkPermission('inventory:edit'), (req, res) => {
   const { name, spec, category, material, qty, min, max, unit, price, location, remark, status, changes } = req.body;
   const safeName = name ? sanitize(name) : undefined;
   const chg = changes ? JSON.stringify(changes) : undefined;
@@ -468,7 +548,7 @@ app.put('/api/inventory/:id', authMiddleware, (req, res) => {
     });
 });
 
-app.delete('/api/inventory/:id', authMiddleware, (req, res) => {
+app.delete('/api/inventory/:id', authMiddleware, checkPermission('inventory:delete'), (req, res) => {
   db.run("DELETE FROM inventory WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     auditLog(req, '删除库存', 'inventory', 'ID=' + req.params.id);
@@ -483,7 +563,7 @@ app.get('/api/inventory/logs', authMiddleware, (req, res) => {
   });
 });
 
-app.post('/api/inventory/in', authMiddleware, (req, res) => {
+app.post('/api/inventory/in', authMiddleware, checkPermission('inventory:in'), (req, res) => {
   const { itemId, qty, remark } = req.body;
   if (!itemId || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: '参数错误' });
   db.get("SELECT * FROM inventory WHERE id = ?", [itemId], (err, item) => {
@@ -499,7 +579,7 @@ app.post('/api/inventory/in', authMiddleware, (req, res) => {
   });
 });
 
-app.post('/api/inventory/out', authMiddleware, (req, res) => {
+app.post('/api/inventory/out', authMiddleware, checkPermission('inventory:out'), (req, res) => {
   const { itemId, qty, remark } = req.body;
   if (!itemId || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: '参数错误' });
   db.get("SELECT * FROM inventory WHERE id = ?", [itemId], (err, item) => {
@@ -516,12 +596,109 @@ app.post('/api/inventory/out', authMiddleware, (req, res) => {
   });
 });
 
-app.get('/api/audit-logs', authMiddleware, (req, res) => {
-  if (req.user.dept !== '管理部') return res.status(403).json({ error: '无权访问' });
+app.get('/api/audit-logs', authMiddleware, checkPermission('audit:view'), (req, res) => {
   db.all("SELECT * FROM audit_logs ORDER BY time DESC LIMIT 500", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
+});
+
+// ============ RBAC API ============
+app.get('/api/roles', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  db.all("SELECT * FROM roles", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/roles', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  const { name, description } = req.body;
+  if (!name) return res.status(400).json({ error: '缺少角色名称' });
+  db.run("INSERT INTO roles (name, description, created) VALUES (?, ?, ?)", [sanitize(name), sanitize(description), Date.now()], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '创建角色', 'role', sanitize(name));
+    res.json({ id: this.lastID });
+  });
+});
+
+app.put('/api/roles/:id', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  const { name, description } = req.body;
+  db.run("UPDATE roles SET name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?", [name ? sanitize(name) : null, description ? sanitize(description) : null, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    auditLog(req, '修改角色', 'role', 'ID=' + req.params.id);
+    res.json({ updated: this.changes });
+  });
+});
+
+app.delete('/api/roles/:id', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  db.run("DELETE FROM roles WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    db.run("DELETE FROM role_permissions WHERE role_id = ?", [req.params.id]);
+    db.run("DELETE FROM user_roles WHERE role_id = ?", [req.params.id]);
+    auditLog(req, '删除角色', 'role', 'ID=' + req.params.id);
+    res.json({ deleted: this.changes });
+  });
+});
+
+app.get('/api/permissions', authMiddleware, (req, res) => {
+  db.all("SELECT * FROM permissions ORDER BY module, code", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.get('/api/roles/:id/permissions', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  db.all("SELECT p.* FROM permissions p JOIN role_permissions rp ON p.id = rp.permission_id WHERE rp.role_id = ?", [req.params.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/roles/:id/permissions', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  const { permissionIds } = req.body;
+  if (!Array.isArray(permissionIds)) return res.status(400).json({ error: '参数错误' });
+  db.run("DELETE FROM role_permissions WHERE role_id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    const stmt = db.prepare("INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)");
+    permissionIds.forEach(pid => stmt.run(req.params.id, pid));
+    stmt.finalize();
+    auditLog(req, '配置角色权限', 'role', 'RoleID=' + req.params.id);
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/users/:id/roles', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  db.all("SELECT r.* FROM roles r JOIN user_roles ur ON r.id = ur.role_id WHERE ur.user_id = ?", [req.params.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/users/:id/roles', authMiddleware, checkPermission('role:manage'), (req, res) => {
+  const { roleIds } = req.body;
+  if (!Array.isArray(roleIds)) return res.status(400).json({ error: '参数错误' });
+  db.run("DELETE FROM user_roles WHERE user_id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    const stmt = db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
+    roleIds.forEach(rid => stmt.run(req.params.id, rid));
+    stmt.finalize();
+    auditLog(req, '分配用户角色', 'user', 'UserID=' + req.params.id);
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/my-permissions', authMiddleware, (req, res) => {
+  if (req.user.role === '总经理') {
+    db.all("SELECT code FROM permissions", [], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows.map(r => r.code));
+    });
+  } else {
+    db.all("SELECT DISTINCT p.code FROM permissions p JOIN role_permissions rp ON p.id = rp.permission_id JOIN user_roles ur ON rp.role_id = ur.role_id WHERE ur.user_id = ?", [req.user.id], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows.map(r => r.code));
+    });
+  }
 });
 
 // ============ 静态文件 & 启动 ============
